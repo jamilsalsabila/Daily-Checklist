@@ -1,0 +1,56 @@
+:root {
+    --color-ink-900: #111827;
+    --color-ink-700: #334155;
+    --color-ink-500: #6b7280;
+
+    --color-surface-0: #ffffff;
+    --color-surface-50: #f8fafc;
+    --color-surface-100: #eef2f8;
+    --color-surface-card: rgba(255, 255, 255, 0.84);
+
+    --color-line-200: #d4deed;
+    --color-line-300: #cad9ef;
+    --color-line-400: #bed0ea;
+
+    --color-primary-600: #1d4ed8;
+    --color-primary-700: #1e40af;
+    --color-primary-900: #1e3a8a;
+
+    --color-info-50: #eaf2ff;
+    --color-info-100: #edf4ff;
+
+    --color-success-50: #ecfdf3;
+    --color-success-200: #b7e8c8;
+    --color-success-800: #166534;
+
+    --color-danger-50: #fff1f2;
+    --color-danger-200: #fecdd3;
+    --color-danger-700: #be123c;
+    --color-danger-800: #9f1239;
+
+    --radius-sm: 12px;
+    --radius-md: 16px;
+    --radius-lg: 20px;
+    --radius-xl: 24px;
+    --radius-pill: 999px;
+
+    --shadow-sm: 0 10px 20px rgba(17, 24, 39, 0.08);
+    --shadow-md: 0 14px 36px rgba(17, 24, 39, 0.08);
+    --shadow-lg: 0 22px 52px rgba(17, 24, 39, 0.12);
+
+    --space-1: 6px;
+    --space-2: 8px;
+    --space-3: 10px;
+    --space-4: 12px;
+    --space-5: 14px;
+    --space-6: 16px;
+    --space-7: 18px;
+    --space-8: 20px;
+    --space-10: 24px;
+
+    /* Backward-compatible aliases for shared component styles. */
+    --ink: var(--color-ink-900);
+    --soft: var(--color-ink-500);
+    --line: var(--color-line-200);
+    --paper-strong: var(--color-surface-0);
+}

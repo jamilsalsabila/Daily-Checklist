@@ -1,0 +1,14 @@
+.card {
+    border: 1px solid var(--line);
+    border-radius: 18px;
+    padding: 16px;
+    background: rgba(255,255,255,0.66);
+}
+
+.panel {
+    background: var(--panel, rgba(255, 253, 248, 0.94));
+    border: 1px solid var(--panel-border, rgba(15, 118, 110, 0.12));
+    border-radius: 24px;
+    padding: 22px;
+    box-shadow: 0 20px 45px rgba(31, 41, 51, 0.08);
+}

@@ -1,0 +1,12 @@
+.btn,
+button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 999px;
+    padding: 12px 18px;
+    text-decoration: none;
+    border: 0;
+    font: inherit;
+    cursor: pointer;
+}

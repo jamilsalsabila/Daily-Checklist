@@ -1,0 +1,5 @@
+.env
+storage/database/*.sqlite
+storage/pdf/*.pdf
+*.log
+.DS_Store
