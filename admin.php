@@ -260,7 +260,10 @@ $initialState = [
                         <div class="detail-card">
                             <h3>Isi Form</h3>
                             <?php foreach (($selectedSchema['sections'] ?? []) as $section): ?>
-                                <h4<?= render_text_style_attr($section['title_style'] ?? []) ?>><?= e((string) ($section['title'] ?? 'Section')) ?></h4>
+                                <?php $sectionTitle = trim((string) ($section['title'] ?? '')); ?>
+                                <?php if ($sectionTitle !== ''): ?>
+                                    <h4<?= render_text_style_attr($section['title_style'] ?? []) ?>><?= e($sectionTitle) ?></h4>
+                                <?php endif; ?>
                                 <?php foreach (($section['fields'] ?? []) as $field): ?>
                                     <?php $value = $selected['responses'][$field['id']] ?? null; ?>
                                     <p><strong<?= render_text_style_attr($field['label_style'] ?? []) ?>><?= e((string) ($field['label'] ?? '')) ?>:</strong> <?= e(TemplateSchema::responseDisplayValue($field, $value)) ?></p>

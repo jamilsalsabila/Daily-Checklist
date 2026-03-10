@@ -172,7 +172,7 @@
                 <div class="detail-card">
                     <h3>Isi Form</h3>
                     ${(schema.sections || []).map((section) => `
-                        <h4${attr(section.title_style || {})}>${escapeHtml(section.title || 'Section')}</h4>
+                        ${String(section.title || '').trim() !== '' ? `<h4${attr(section.title_style || {})}>${escapeHtml(section.title || '')}</h4>` : ''}
                         ${(section.fields || []).map((field) => {
                             const responses = selected.responses || {};
                             const value = responses[field.id];

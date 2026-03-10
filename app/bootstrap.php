@@ -28,7 +28,12 @@ function generate_submission_pdf(array $submission): string
     $pdf->addDivider();
 
     foreach ($schema['sections'] as $sectionIndex => $section) {
-        $pdf->addSection(($sectionIndex + 1) . '. ' . (string) ($section['title'] ?? 'Section'));
+        $sectionTitle = trim((string) ($section['title'] ?? ''));
+        if ($sectionTitle !== '') {
+            $pdf->addSection(($sectionIndex + 1) . '. ' . $sectionTitle);
+        } else {
+            $pdf->addSpacer(2);
+        }
         foreach ($section['fields'] as $field) {
             $fieldId = (string) ($field['id'] ?? '');
             $type = (string) ($field['type'] ?? 'single_line_text');

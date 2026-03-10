@@ -93,8 +93,11 @@ function render_edit_field_input(array $field, mixed $value = null): string
             <input type="hidden" name="csrf_token" value="<?= e(csrf_token()) ?>">
 
             <?php foreach ($schema['sections'] as $section): ?>
+                <?php $sectionTitle = trim((string) ($section['title'] ?? '')); ?>
                 <section class="sheet">
-                    <h2 class="section-title"<?= render_text_style_attr($section['title_style'] ?? []) ?>><?= e((string) ($section['title'] ?? 'Section')) ?></h2>
+                    <?php if ($sectionTitle !== ''): ?>
+                        <h2 class="section-title"<?= render_text_style_attr($section['title_style'] ?? []) ?>><?= e($sectionTitle) ?></h2>
+                    <?php endif; ?>
                     <div class="grid">
                         <?php foreach ($section['fields'] as $field): ?>
                             <?php $type = (string) ($field['type'] ?? 'single_line_text'); ?>

@@ -328,7 +328,7 @@ final class TemplateSchema
 
             $sections[] = [
                 'id' => $sectionId,
-                'title' => $title !== '' ? $title : 'Section ' . ($index + 1),
+                'title' => $title,
                 'description' => $description,
                 'title_style' => self::normalizeTextStyle($sectionRaw['title_style'] ?? []),
                 'fields' => $fields,

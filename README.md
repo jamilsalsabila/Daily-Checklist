@@ -55,6 +55,7 @@ Web app checklist operasional berbasis PHP + SQLite, dengan template dinamis per
 
 ## Catatan Version Log
 
+- `2026-03-11` - Tighten template builder spacing and allow empty section title (no fallback "Section X" in form/admin/PDF/preview).
 - `03b19db` - Add multi-template checklist management.
 - `d1c3771` - Convert admin page to lightweight SPA.
 

@@ -75,6 +75,15 @@
         return el;
     };
 
+    const dragHandle = (label = 'Drag') => {
+        const el = document.createElement('button');
+        el.type = 'button';
+        el.className = 'drag-handle';
+        el.textContent = label;
+        el.draggable = true;
+        return el;
+    };
+
     const textInput = (value, placeholder, className = '') => {
         const el = document.createElement('input');
         el.type = 'text';
@@ -221,9 +230,12 @@
     const createFieldCard = (field = {}) => {
         const card = document.createElement('div');
         card.className = 'field-card';
+        card.dataset.dndItem = 'field';
 
         const row1 = document.createElement('div');
-        row1.className = 'builder-row';
+        row1.className = 'builder-row builder-row-handle';
+
+        const handle = dragHandle('Drag Field');
 
         const labelInput = textInput(field.label || '', 'Label field');
         labelInput.dataset.field = 'label';
@@ -232,9 +244,12 @@
         idInput.dataset.field = 'id';
 
         const removeBtn = btn('Hapus Field', 'btn btn-delete btn-small');
-        removeBtn.addEventListener('click', () => card.remove());
+        removeBtn.addEventListener('click', () => {
+            card.remove();
+            syncJson();
+        });
 
-        row1.append(labelInput, idInput, removeBtn);
+        row1.append(handle, labelInput, idInput, removeBtn);
 
         const labelStyleEditor = createStyleEditor(field.label_style || {});
 
@@ -291,20 +306,26 @@
     const createSectionCard = (section = {}) => {
         const card = document.createElement('article');
         card.className = 'opening-card';
+        card.dataset.dndItem = 'section';
 
         const head = document.createElement('div');
-        head.className = 'opening-card-head';
+        head.className = 'opening-card-head opening-card-head-handle';
 
-        const sectionTitleInput = textInput(section.title || '', 'Nama section');
+        const handle = dragHandle('Drag Section');
+
+        const sectionTitleInput = textInput(section.title || '', 'Nama section (opsional)');
         sectionTitleInput.dataset.field = 'title';
 
         const idInput = textInput(section.id || '', 'section_id', 'builder-key');
         idInput.dataset.field = 'id';
 
         const removeBtn = btn('Hapus Section', 'btn btn-delete btn-small');
-        removeBtn.addEventListener('click', () => card.remove());
+        removeBtn.addEventListener('click', () => {
+            card.remove();
+            syncJson();
+        });
 
-        head.append(sectionTitleInput, idInput, removeBtn);
+        head.append(handle, sectionTitleInput, idInput, removeBtn);
 
         const sectionStyleEditor = createStyleEditor(section.title_style || {});
 
@@ -314,10 +335,12 @@
         const fieldsList = document.createElement('div');
         fieldsList.className = 'builder-list nested-list';
         fieldsList.dataset.field = 'fields-list';
+        fieldsList.dataset.dndList = 'field';
 
         const addFieldBtn = btn('Tambah Field');
         addFieldBtn.addEventListener('click', () => {
             fieldsList.appendChild(createFieldCard());
+            syncJson();
         });
 
         const fields = Array.isArray(section.fields) ? section.fields : [];
@@ -386,7 +409,7 @@
 
             return {
                 id: sectionId,
-                title: String(sectionTitleInput?.value || '').trim() || `Section ${sectionIndex + 1}`,
+                title: String(sectionTitleInput?.value || '').trim(),
                 description: String(descriptionInput?.value || '').trim(),
                 title_style: readStyleFromContainer(sectionEl.querySelector('[data-field="style"]')),
                 fields,
@@ -501,14 +524,17 @@
             return;
         }
 
-        sections.forEach((section, index) => {
+        sections.forEach((section) => {
             const sectionEl = document.createElement('section');
             sectionEl.className = 'preview-section';
 
-            const titleEl = document.createElement('h5');
-            titleEl.textContent = section.title || `Section ${index + 1}`;
-            titleEl.style.cssText = styleToCss(section.title_style || {});
-            sectionEl.appendChild(titleEl);
+            const sectionTitle = String(section.title || '').trim();
+            if (sectionTitle !== '') {
+                const titleEl = document.createElement('h5');
+                titleEl.textContent = sectionTitle;
+                titleEl.style.cssText = styleToCss(section.title_style || {});
+                sectionEl.appendChild(titleEl);
+            }
 
             if (section.description) {
                 const descEl = document.createElement('p');
@@ -554,6 +580,182 @@
     document.getElementById('add-section')?.addEventListener('click', () => {
         sectionsList.appendChild(createSectionCard());
         syncJson();
+    });
+
+    sectionsList.dataset.dndList = 'section';
+
+    const dndState = {
+        item: null,
+        type: '',
+    };
+    const touchDnd = {
+        active: false,
+        moved: false,
+        item: null,
+        type: '',
+    };
+
+    const clearDndState = () => {
+        if (dndState.item) {
+            dndState.item.classList.remove('dragging');
+        }
+        dndState.item = null;
+        dndState.type = '';
+    };
+
+    const clearTouchDnd = (shouldSync = false) => {
+        if (touchDnd.item) {
+            touchDnd.item.classList.remove('dragging');
+        }
+        const changed = shouldSync && touchDnd.moved;
+        touchDnd.active = false;
+        touchDnd.moved = false;
+        touchDnd.item = null;
+        touchDnd.type = '';
+        if (changed) {
+            syncJson();
+        }
+    };
+
+    const autoScrollForTouchDrag = (clientY) => {
+        const threshold = 84;
+        const maxSpeed = 18;
+        const viewportHeight = window.innerHeight || 0;
+        if (viewportHeight <= 0) {
+            return;
+        }
+
+        let delta = 0;
+        if (clientY < threshold) {
+            delta = -Math.ceil(((threshold - clientY) / threshold) * maxSpeed);
+        } else if (clientY > viewportHeight - threshold) {
+            delta = Math.ceil(((clientY - (viewportHeight - threshold)) / threshold) * maxSpeed);
+        }
+
+        if (delta !== 0) {
+            window.scrollBy(0, delta);
+        }
+    };
+
+    form.addEventListener('dragstart', (event) => {
+        const target = event.target;
+        if (!(target instanceof HTMLElement)) return;
+        const handle = target.closest('.drag-handle');
+        if (!(handle instanceof HTMLElement)) return;
+
+        const item = handle.closest('[data-dnd-item]');
+        if (!(item instanceof HTMLElement)) return;
+
+        dndState.item = item;
+        dndState.type = item.dataset.dndItem || '';
+        item.classList.add('dragging');
+        if (event.dataTransfer) {
+            event.dataTransfer.effectAllowed = 'move';
+            event.dataTransfer.setData('text/plain', dndState.type);
+        }
+    });
+
+    form.addEventListener('dragover', (event) => {
+        if (!dndState.item) return;
+        const target = event.target;
+        if (!(target instanceof HTMLElement)) return;
+
+        const list = target.closest('[data-dnd-list]');
+        if (!(list instanceof HTMLElement)) return;
+        if (list.dataset.dndList !== dndState.type) return;
+
+        event.preventDefault();
+        const items = Array.from(list.querySelectorAll(`[data-dnd-item="${dndState.type}"]`)).filter((el) => el !== dndState.item);
+        if (items.length === 0) {
+            list.appendChild(dndState.item);
+            return;
+        }
+
+        const nextItem = items.find((el) => {
+            const rect = el.getBoundingClientRect();
+            return event.clientY < rect.top + (rect.height / 2);
+        });
+
+        if (nextItem) {
+            list.insertBefore(dndState.item, nextItem);
+        } else {
+            list.appendChild(dndState.item);
+        }
+    });
+
+    form.addEventListener('drop', (event) => {
+        if (!dndState.item) return;
+        event.preventDefault();
+        clearDndState();
+        syncJson();
+    });
+
+    form.addEventListener('dragend', () => {
+        clearDndState();
+    });
+
+    // Touch/pen reorder for mobile devices where HTML5 drag is limited.
+    form.addEventListener('pointerdown', (event) => {
+        if (event.pointerType === 'mouse') return;
+        const target = event.target;
+        if (!(target instanceof HTMLElement)) return;
+        const handle = target.closest('.drag-handle');
+        if (!(handle instanceof HTMLElement)) return;
+        const item = handle.closest('[data-dnd-item]');
+        if (!(item instanceof HTMLElement)) return;
+
+        touchDnd.active = true;
+        touchDnd.moved = false;
+        touchDnd.item = item;
+        touchDnd.type = item.dataset.dndItem || '';
+        item.classList.add('dragging');
+        event.preventDefault();
+    });
+
+    form.addEventListener('pointermove', (event) => {
+        if (!touchDnd.active || !touchDnd.item) return;
+        if (event.pointerType === 'mouse') return;
+        event.preventDefault();
+        autoScrollForTouchDrag(event.clientY);
+
+        const hovered = document.elementFromPoint(event.clientX, event.clientY);
+        if (!(hovered instanceof HTMLElement)) return;
+        const list = hovered.closest('[data-dnd-list]');
+        if (!(list instanceof HTMLElement)) return;
+        if (list.dataset.dndList !== touchDnd.type) return;
+
+        const items = Array.from(list.querySelectorAll(`[data-dnd-item="${touchDnd.type}"]`)).filter((el) => el !== touchDnd.item);
+        if (items.length === 0) {
+            list.appendChild(touchDnd.item);
+            touchDnd.moved = true;
+            return;
+        }
+
+        const nextItem = items.find((el) => {
+            const rect = el.getBoundingClientRect();
+            return event.clientY < rect.top + (rect.height / 2);
+        });
+        if (nextItem) {
+            if (touchDnd.item !== nextItem.previousSibling) {
+                list.insertBefore(touchDnd.item, nextItem);
+                touchDnd.moved = true;
+            }
+        } else {
+            if (list.lastElementChild !== touchDnd.item) {
+                list.appendChild(touchDnd.item);
+                touchDnd.moved = true;
+            }
+        }
+    }, { passive: false });
+
+    window.addEventListener('pointerup', () => {
+        if (!touchDnd.active) return;
+        clearTouchDnd(true);
+    });
+
+    window.addEventListener('pointercancel', () => {
+        if (!touchDnd.active) return;
+        clearTouchDnd(true);
     });
 
     document.getElementById('apply-json-to-builder')?.addEventListener('click', () => {

@@ -126,12 +126,15 @@ function render_field_input(array $field, mixed $value = null): string
                 <input type="hidden" name="template_version_id" value="<?= e((string) ($selectedTemplate['current_version_id'] ?? '')) ?>">
                 <input type="hidden" name="template_slug" value="<?= e((string) ($selectedTemplate['slug'] ?? '')) ?>">
                 <?php foreach ($schema['sections'] as $section): ?>
+                    <?php $sectionTitle = trim((string) ($section['title'] ?? '')); ?>
                     <section class="sheet">
-                        <div class="section-head">
-                            <div>
-                                <h2 class="section-title"<?= render_text_style_attr($section['title_style'] ?? []) ?>><?= e((string) ($section['title'] ?? 'Section')) ?></h2>
+                        <?php if ($sectionTitle !== ''): ?>
+                            <div class="section-head">
+                                <div>
+                                    <h2 class="section-title"<?= render_text_style_attr($section['title_style'] ?? []) ?>><?= e($sectionTitle) ?></h2>
+                                </div>
                             </div>
-                        </div>
+                        <?php endif; ?>
                         <div class="grid">
                             <?php foreach ($section['fields'] as $field): ?>
                                 <?php $type = (string) ($field['type'] ?? 'single_line_text'); ?>

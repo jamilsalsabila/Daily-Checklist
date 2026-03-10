@@ -54,10 +54,10 @@ body {
 
 .form-panel {
     display: grid;
-    gap: 12px;
+    gap: 10px;
     background: var(--paper);
     border-radius: 22px;
-    padding: 20px;
+    padding: 18px;
     box-shadow: var(--shadow);
 }
 
@@ -65,9 +65,9 @@ body {
     border: 1px solid var(--line);
     border-radius: 16px;
     background: rgba(255, 255, 255, 0.72);
-    padding: 14px;
+    padding: 12px;
     display: grid;
-    gap: 12px;
+    gap: 10px;
 }
 
 .builder-card h2 {
@@ -83,10 +83,10 @@ body {
 .style-box {
     border: 1px solid var(--line);
     border-radius: 12px;
-    padding: 10px;
+    padding: 8px;
     background: rgba(255, 255, 255, 0.84);
     display: grid;
-    gap: 8px;
+    gap: 6px;
     min-width: 0;
 }
 
@@ -108,10 +108,10 @@ body {
 .builder-section {
     border: 1px solid var(--line);
     border-radius: 14px;
-    padding: 12px;
+    padding: 10px;
     background: rgba(255, 255, 255, 0.82);
     display: grid;
-    gap: 10px;
+    gap: 8px;
 }
 
 .builder-section h3 {
@@ -130,9 +130,9 @@ body {
     border: 1px solid var(--line);
     border-radius: 14px;
     background: linear-gradient(180deg, #fff, #fafcff);
-    padding: 14px;
+    padding: 12px;
     display: grid;
-    gap: 12px;
+    gap: 10px;
 }
 
 .preview-header h4 {
@@ -150,16 +150,16 @@ body {
 
 .preview-body {
     display: grid;
-    gap: 10px;
+    gap: 8px;
 }
 
 .preview-section {
     border: 1px solid var(--line);
     border-radius: 12px;
-    padding: 10px;
+    padding: 8px;
     background: rgba(255, 255, 255, 0.9);
     display: grid;
-    gap: 8px;
+    gap: 6px;
 }
 
 .preview-section h5 {
@@ -176,7 +176,7 @@ body {
 
 .preview-field {
     display: grid;
-    gap: 6px;
+    gap: 4px;
 }
 
 .preview-field span {
@@ -187,7 +187,7 @@ body {
 
 .preview-choices {
     display: flex;
-    gap: 8px;
+    gap: 6px;
     flex-wrap: wrap;
 }
 
@@ -206,24 +206,28 @@ body {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 10px;
+    gap: 8px;
     flex-wrap: wrap;
 }
 
 .builder-list {
     display: grid;
-    gap: 8px;
+    gap: 6px;
 }
 
 .builder-row {
     display: grid;
     grid-template-columns: minmax(120px, 0.35fr) minmax(0, 1fr) auto;
-    gap: 8px;
+    gap: 6px;
     align-items: center;
 }
 
+.builder-row.builder-row-handle {
+    grid-template-columns: 96px minmax(0, 1fr) minmax(120px, 0.35fr) auto;
+}
+
 .builder-row input {
-    padding: 10px 12px;
+    padding: 8px 10px;
     border-radius: 12px;
 }
 
@@ -232,14 +236,14 @@ body {
     border: 1px solid var(--line);
     background: rgba(255, 255, 255, 0.92);
     border-radius: 12px;
-    padding: 10px 12px;
+    padding: 8px 10px;
     font: inherit;
 }
 
 .style-inline {
     display: grid;
     grid-template-columns: 130px 92px repeat(3, auto) 58px;
-    gap: 8px;
+    gap: 6px;
     align-items: center;
 }
 
@@ -258,9 +262,15 @@ body {
     border: 1px solid var(--line);
     border-radius: 12px;
     background: rgba(255, 255, 255, 0.92);
-    padding: 10px;
+    padding: 8px;
     display: grid;
-    gap: 8px;
+    gap: 6px;
+}
+
+.field-card.dragging,
+.opening-card.dragging {
+    opacity: 0.55;
+    border-style: dashed;
 }
 
 .field-config {
@@ -275,17 +285,21 @@ body {
 .opening-card {
     border: 1px solid var(--line);
     border-radius: 14px;
-    padding: 10px;
+    padding: 8px;
     background: rgba(255, 255, 255, 0.9);
     display: grid;
-    gap: 8px;
+    gap: 6px;
 }
 
 .opening-card-head {
     display: grid;
     grid-template-columns: minmax(0, 1fr) minmax(140px, 0.35fr) auto;
-    gap: 8px;
+    gap: 6px;
     align-items: center;
+}
+
+.opening-card-head.opening-card-head-handle {
+    grid-template-columns: 110px minmax(0, 1fr) minmax(140px, 0.35fr) auto;
 }
 
 .nested-list .builder-row {
@@ -294,6 +308,29 @@ body {
 
 .nested-list .field-card .builder-row {
     grid-template-columns: minmax(120px, 0.35fr) minmax(0, 1fr) auto;
+}
+
+.nested-list .field-card .builder-row.builder-row-handle {
+    grid-template-columns: 96px minmax(0, 1fr) minmax(120px, 0.35fr) auto;
+}
+
+.drag-handle {
+    border: 1px dashed var(--line);
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.85);
+    color: var(--soft);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    padding: 7px 9px;
+    cursor: grab;
+    touch-action: none;
+    user-select: none;
+}
+
+.drag-handle:active {
+    cursor: grabbing;
 }
 
 .code-area {
@@ -365,7 +402,16 @@ body {
     .opening-card-head {
         grid-template-columns: 1fr;
     }
+    .opening-card-head.opening-card-head-handle {
+        grid-template-columns: 1fr;
+    }
     .builder-row {
+        grid-template-columns: 1fr;
+    }
+    .builder-row.builder-row-handle {
+        grid-template-columns: 1fr;
+    }
+    .nested-list .field-card .builder-row.builder-row-handle {
         grid-template-columns: 1fr;
     }
     .style-inline {
