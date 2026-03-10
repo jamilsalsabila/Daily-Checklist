@@ -303,9 +303,15 @@
         return card;
     };
 
-    const createSectionCard = (section = {}) => {
+    const getDirectChildrenByClass = (parent, className) =>
+        Array.from(parent.children).filter((child) => child instanceof HTMLElement && child.classList.contains(className));
+
+    const getDirectChild = (parent, selector) =>
+        Array.from(parent.children).find((child) => child instanceof HTMLElement && child.matches(selector)) || null;
+
+    const createSectionCard = (section = {}, depth = 0) => {
         const card = document.createElement('article');
-        card.className = 'opening-card';
+        card.className = `opening-card depth-${Math.min(depth, 4)}`;
         card.dataset.dndItem = 'section';
 
         const head = document.createElement('div');
@@ -343,6 +349,17 @@
             syncJson();
         });
 
+        const childrenList = document.createElement('div');
+        childrenList.className = 'builder-list section-children-list';
+        childrenList.dataset.field = 'children-list';
+        childrenList.dataset.dndList = 'section';
+
+        const addChildBtn = btn('Tambah Subsection', 'btn btn-ghost btn-small');
+        addChildBtn.addEventListener('click', () => {
+            childrenList.appendChild(createSectionCard({}, depth + 1));
+            syncJson();
+        });
+
         const fields = Array.isArray(section.fields) ? section.fields : [];
         if (fields.length === 0) {
             fieldsList.appendChild(createFieldCard());
@@ -350,71 +367,97 @@
             fields.forEach((field) => fieldsList.appendChild(createFieldCard(field)));
         }
 
-        card.append(head, sectionStyleEditor, descInput, fieldsList, addFieldBtn);
+        const children = Array.isArray(section.children) ? section.children : [];
+        children.forEach((child) => childrenList.appendChild(createSectionCard(child, depth + 1)));
+
+        const actions = document.createElement('div');
+        actions.className = 'section-actions';
+        actions.append(addFieldBtn, addChildBtn);
+
+        card.append(head, sectionStyleEditor, descInput, fieldsList, childrenList, actions);
         return card;
     };
 
     const parseBuilder = () => {
-        const sections = Array.from(sectionsList.querySelectorAll('.opening-card')).map((sectionEl, sectionIndex) => {
-            const sectionTitleInput = sectionEl.querySelector('[data-field="title"]');
-            const idInput = sectionEl.querySelector('[data-field="id"]');
-            const descriptionInput = sectionEl.querySelector('[data-field="description"]');
-            const fieldsEls = Array.from(sectionEl.querySelectorAll('.field-card'));
+        const parseFieldCards = (fieldsList, sectionId) =>
+            getDirectChildrenByClass(fieldsList, 'field-card')
+                .map((fieldEl, fieldIndex) => {
+                    const labelInput = fieldEl.querySelector('[data-field="label"]');
+                    const fieldIdInput = fieldEl.querySelector('[data-field="id"]');
+                    const typeSelect = fieldEl.querySelector('[data-field="type"]');
+                    const placeholderInput = fieldEl.querySelector('[data-field="placeholder"]');
+                    const requiredInput = fieldEl.querySelector('[data-field="required"]');
+                    const optionsInput = fieldEl.querySelector('[data-field="options"]');
 
-            const sectionId = slugify(idInput?.value || '', `section_${sectionIndex + 1}`);
+                    const label = String(labelInput?.value || '').trim();
+                    if (!label) {
+                        return null;
+                    }
+
+                    const fieldId = slugify(fieldIdInput?.value || '', `${sectionId}_field_${fieldIndex + 1}`);
+                    if (fieldIdInput instanceof HTMLInputElement) {
+                        fieldIdInput.value = fieldId;
+                    }
+                    const type = String(typeSelect?.value || 'single_line_text');
+
+                    const field = {
+                        id: fieldId,
+                        type,
+                        label,
+                        required: Boolean(requiredInput?.checked),
+                        label_style: readStyleFromContainer(fieldEl.querySelector('[data-field="style"]')),
+                    };
+
+                    const placeholder = String(placeholderInput?.value || '').trim();
+                    if (placeholder) field.placeholder = placeholder;
+
+                    if (type === 'single_select' || type === 'multi_select') {
+                        field.options = optionsInputToArray(optionsInput?.value);
+                    }
+
+                    return field;
+                })
+                .filter(Boolean);
+
+        const parseSectionCard = (sectionEl, prefix, index) => {
+            const headEl = getDirectChild(sectionEl, '.opening-card-head');
+            const sectionTitleInput = headEl?.querySelector('[data-field="title"]');
+            const idInput = headEl?.querySelector('[data-field="id"]');
+            const descriptionInput = getDirectChild(sectionEl, '[data-field="description"]');
+            const fieldsList = getDirectChild(sectionEl, '[data-field="fields-list"]');
+            const childrenList = getDirectChild(sectionEl, '[data-field="children-list"]');
+
+            const sectionId = slugify(idInput?.value || '', `${prefix}_${index + 1}`);
             if (idInput instanceof HTMLInputElement) {
                 idInput.value = sectionId;
             }
 
-            const fields = fieldsEls.map((fieldEl, fieldIndex) => {
-                const labelInput = fieldEl.querySelector('[data-field="label"]');
-                const fieldIdInput = fieldEl.querySelector('[data-field="id"]');
-                const typeSelect = fieldEl.querySelector('[data-field="type"]');
-                const placeholderInput = fieldEl.querySelector('[data-field="placeholder"]');
-                const requiredInput = fieldEl.querySelector('[data-field="required"]');
-                const optionsInput = fieldEl.querySelector('[data-field="options"]');
+            const fields = fieldsList instanceof HTMLElement ? parseFieldCards(fieldsList, sectionId) : [];
+            const childSections = childrenList instanceof HTMLElement
+                ? getDirectChildrenByClass(childrenList, 'opening-card').map((child, childIndex) =>
+                    parseSectionCard(child, sectionId, childIndex)
+                ).filter(Boolean)
+                : [];
 
-                const label = String(labelInput?.value || '').trim();
-                if (!label) {
-                    return null;
-                }
-
-                const fieldId = slugify(fieldIdInput?.value || '', `${sectionId}_field_${fieldIndex + 1}`);
-                if (fieldIdInput instanceof HTMLInputElement) {
-                    fieldIdInput.value = fieldId;
-                }
-                const type = String(typeSelect?.value || 'single_line_text');
-
-                const field = {
-                    id: fieldId,
-                    type,
-                    label,
-                    required: Boolean(requiredInput?.checked),
-                    label_style: readStyleFromContainer(fieldEl.querySelector('[data-field="style"]')),
-                };
-
-                const placeholder = String(placeholderInput?.value || '').trim();
-                if (placeholder) field.placeholder = placeholder;
-
-                if (type === 'single_select' || type === 'multi_select') {
-                    field.options = optionsInputToArray(optionsInput?.value);
-                }
-
-                return field;
-            }).filter(Boolean);
-
-            if (fields.length === 0) {
-                return null;
-            }
-
-            return {
+            const parsed = {
                 id: sectionId,
                 title: String(sectionTitleInput?.value || '').trim(),
                 description: String(descriptionInput?.value || '').trim(),
-                title_style: readStyleFromContainer(sectionEl.querySelector('[data-field="style"]')),
+                title_style: readStyleFromContainer(sectionEl.querySelector(':scope > [data-field="style"]')),
                 fields,
             };
-        }).filter(Boolean);
+            if (childSections.length > 0) {
+                parsed.children = childSections;
+            }
+            if (!parsed.title && !parsed.description && parsed.fields.length === 0 && childSections.length === 0) {
+                return null;
+            }
+            return parsed;
+        };
+
+        const sections = getDirectChildrenByClass(sectionsList, 'opening-card')
+            .map((sectionEl, sectionIndex) => parseSectionCard(sectionEl, 'section', sectionIndex))
+            .filter(Boolean);
 
         return {
             header: {
@@ -439,7 +482,7 @@
             sectionsList.appendChild(createSectionCard());
             return;
         }
-        sections.forEach((section) => sectionsList.appendChild(createSectionCard(section)));
+        sections.forEach((section) => sectionsList.appendChild(createSectionCard(section, 0)));
     };
 
     const renderPreviewField = (field) => {
@@ -524,9 +567,9 @@
             return;
         }
 
-        sections.forEach((section) => {
+        const renderPreviewSection = (section, depth = 0) => {
             const sectionEl = document.createElement('section');
-            sectionEl.className = 'preview-section';
+            sectionEl.className = `preview-section preview-depth-${Math.min(depth, 4)}`;
 
             const sectionTitle = String(section.title || '').trim();
             if (sectionTitle !== '') {
@@ -545,7 +588,14 @@
             const fields = Array.isArray(section.fields) ? section.fields : [];
             fields.forEach((field) => sectionEl.appendChild(renderPreviewField(field)));
 
-            previewBodyEl.appendChild(sectionEl);
+            const children = Array.isArray(section.children) ? section.children : [];
+            children.forEach((child) => sectionEl.appendChild(renderPreviewSection(child, depth + 1)));
+
+            return sectionEl;
+        };
+
+        sections.forEach((section) => {
+            previewBodyEl.appendChild(renderPreviewSection(section, 0));
         });
     };
 
@@ -594,6 +644,12 @@
         item: null,
         type: '',
     };
+    const getDirectDndItems = (list, type, except = null) =>
+        Array.from(list.children).filter((el) =>
+            el instanceof HTMLElement &&
+            el.dataset.dndItem === type &&
+            el !== except
+        );
 
     const clearDndState = () => {
         if (dndState.item) {
@@ -663,9 +719,10 @@
         const list = target.closest('[data-dnd-list]');
         if (!(list instanceof HTMLElement)) return;
         if (list.dataset.dndList !== dndState.type) return;
+        if (dndState.item.contains(list)) return;
 
         event.preventDefault();
-        const items = Array.from(list.querySelectorAll(`[data-dnd-item="${dndState.type}"]`)).filter((el) => el !== dndState.item);
+        const items = getDirectDndItems(list, dndState.type, dndState.item);
         if (items.length === 0) {
             list.appendChild(dndState.item);
             return;
@@ -723,8 +780,9 @@
         const list = hovered.closest('[data-dnd-list]');
         if (!(list instanceof HTMLElement)) return;
         if (list.dataset.dndList !== touchDnd.type) return;
+        if (touchDnd.item.contains(list)) return;
 
-        const items = Array.from(list.querySelectorAll(`[data-dnd-item="${touchDnd.type}"]`)).filter((el) => el !== touchDnd.item);
+        const items = getDirectDndItems(list, touchDnd.type, touchDnd.item);
         if (items.length === 0) {
             list.appendChild(touchDnd.item);
             touchDnd.moved = true;

@@ -62,6 +62,56 @@ function render_edit_field_input(array $field, mixed $value = null): string
     };
     return '<input type="' . $inputType . '" name="' . e($name) . '" value="' . e((string) $value) . '" placeholder="' . $placeholder . '"' . $required . '>';
 }
+
+function render_edit_section(array $section, array $responses, int $depth = 0): string
+{
+    $title = trim((string) ($section['title'] ?? ''));
+    $description = trim((string) ($section['description'] ?? ''));
+    $fields = is_array($section['fields'] ?? null) ? $section['fields'] : [];
+    $children = is_array($section['children'] ?? null) ? $section['children'] : [];
+    $tag = $depth === 0 ? 'section' : 'div';
+    $class = $depth === 0 ? 'sheet' : 'nested-section nested-depth-' . min($depth, 4);
+    $headingLevel = min(6, 2 + $depth);
+    $html = '<' . $tag . ' class="' . $class . '">';
+
+    if ($title !== '') {
+        $html .= '<h' . $headingLevel . ' class="section-title"'
+            . render_text_style_attr($section['title_style'] ?? [])
+            . '>' . e($title) . '</h' . $headingLevel . '>';
+    }
+    if ($description !== '') {
+        $html .= '<p class="section-desc">' . e($description) . '</p>';
+    }
+
+    if ($fields !== []) {
+        $html .= '<div class="grid">';
+        foreach ($fields as $field) {
+            $type = (string) ($field['type'] ?? 'single_line_text');
+            $value = $responses[$field['id']] ?? null;
+            if ($type === 'checkbox') {
+                $html .= '<label class="check-item">'
+                    . render_edit_field_input($field, $value)
+                    . '<span' . render_text_style_attr($field['label_style'] ?? []) . '>' . e((string) ($field['label'] ?? '')) . '</span>'
+                    . '</label>';
+                continue;
+            }
+            $html .= '<label class="meta">'
+                . '<span' . render_text_style_attr($field['label_style'] ?? []) . '>' . e((string) ($field['label'] ?? '')) . '</span>'
+                . render_edit_field_input($field, $value)
+                . '</label>';
+        }
+        $html .= '</div>';
+    }
+
+    foreach ($children as $childSection) {
+        if (is_array($childSection)) {
+            $html .= render_edit_section($childSection, $responses, $depth + 1);
+        }
+    }
+
+    $html .= '</' . $tag . '>';
+    return $html;
+}
 ?>
 <!doctype html>
 <html lang="id">
@@ -93,29 +143,7 @@ function render_edit_field_input(array $field, mixed $value = null): string
             <input type="hidden" name="csrf_token" value="<?= e(csrf_token()) ?>">
 
             <?php foreach ($schema['sections'] as $section): ?>
-                <?php $sectionTitle = trim((string) ($section['title'] ?? '')); ?>
-                <section class="sheet">
-                    <?php if ($sectionTitle !== ''): ?>
-                        <h2 class="section-title"<?= render_text_style_attr($section['title_style'] ?? []) ?>><?= e($sectionTitle) ?></h2>
-                    <?php endif; ?>
-                    <div class="grid">
-                        <?php foreach ($section['fields'] as $field): ?>
-                            <?php $type = (string) ($field['type'] ?? 'single_line_text'); ?>
-                            <?php $value = $responses[$field['id']] ?? null; ?>
-                            <?php if ($type === 'checkbox'): ?>
-                                <label class="check-item">
-                                    <?= render_edit_field_input($field, $value) ?>
-                                    <span<?= render_text_style_attr($field['label_style'] ?? []) ?>><?= e((string) ($field['label'] ?? '')) ?></span>
-                                </label>
-                            <?php else: ?>
-                                <label class="meta">
-                                    <span<?= render_text_style_attr($field['label_style'] ?? []) ?>><?= e((string) ($field['label'] ?? '')) ?></span>
-                                    <?= render_edit_field_input($field, $value) ?>
-                                </label>
-                            <?php endif; ?>
-                        <?php endforeach; ?>
-                    </div>
-                </section>
+                <?= render_edit_section($section, $responses) ?>
             <?php endforeach; ?>
 
             <div class="submit-wrap">

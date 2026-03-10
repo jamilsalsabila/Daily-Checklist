@@ -113,6 +113,26 @@
         `;
     };
 
+    const renderSectionDetail = (section, responses, depth = 0) => {
+        const title = String(section?.title || '').trim();
+        const headingLevel = Math.min(6, 4 + depth);
+        const heading = title !== '' ? `<h${headingLevel}${attr(section?.title_style || {})}>${escapeHtml(title)}</h${headingLevel}>` : '';
+        const fieldsHtml = (section?.fields || []).map((field) => {
+            const value = responses?.[field.id];
+            let display = '-';
+            if (field.type === 'checkbox') {
+                display = value ? 'Ya' : 'Tidak';
+            } else if (Array.isArray(value)) {
+                display = value.length ? value.join(', ') : '-';
+            } else if (value !== null && value !== undefined && String(value).trim() !== '') {
+                display = String(value);
+            }
+            return `<p><strong${attr(field.label_style || {})}>${escapeHtml(field.label || '')}:</strong> ${escapeHtml(display)}</p>`;
+        }).join('');
+        const childrenHtml = (section?.children || []).map((child) => renderSectionDetail(child, responses, depth + 1)).join('');
+        return `${heading}${fieldsHtml}${childrenHtml}`;
+    };
+
     const renderList = () => {
         const submissions = Array.isArray(state.submissions) ? state.submissions : [];
         const selectedCode = state.filters?.code || '';
@@ -172,20 +192,7 @@
                 <div class="detail-card">
                     <h3>Isi Form</h3>
                     ${(schema.sections || []).map((section) => `
-                        ${String(section.title || '').trim() !== '' ? `<h4${attr(section.title_style || {})}>${escapeHtml(section.title || '')}</h4>` : ''}
-                        ${(section.fields || []).map((field) => {
-                            const responses = selected.responses || {};
-                            const value = responses[field.id];
-                            let display = '-';
-                            if (field.type === 'checkbox') {
-                                display = value ? 'Ya' : 'Tidak';
-                            } else if (Array.isArray(value)) {
-                                display = value.length ? value.join(', ') : '-';
-                            } else if (value !== null && value !== undefined && String(value).trim() !== '') {
-                                display = String(value);
-                            }
-                            return `<p><strong${attr(field.label_style || {})}>${escapeHtml(field.label || '')}:</strong> ${escapeHtml(display)}</p>`;
-                        }).join('')}
+                        ${renderSectionDetail(section, selected.responses || {}, 0)}
                     `).join('')}
                 </div>
                 <div class="detail-card">

@@ -9,23 +9,21 @@ function admin_response_completion(array $schema, array $responses): string
 {
     $answered = 0;
     $total = 0;
-    foreach ($schema['sections'] ?? [] as $section) {
-        foreach ($section['fields'] ?? [] as $field) {
-            $fieldId = (string) ($field['id'] ?? '');
-            if ($fieldId === '') {
-                continue;
-            }
-            $total++;
-            $value = $responses[$fieldId] ?? null;
-            if (is_array($value)) {
-                if ($value !== []) {
-                    $answered++;
-                }
-                continue;
-            }
-            if ($value !== null && trim((string) $value) !== '' && $value !== false) {
+    foreach (TemplateSchema::allFields($schema) as $field) {
+        $fieldId = (string) ($field['id'] ?? '');
+        if ($fieldId === '') {
+            continue;
+        }
+        $total++;
+        $value = $responses[$fieldId] ?? null;
+        if (is_array($value)) {
+            if ($value !== []) {
                 $answered++;
             }
+            continue;
+        }
+        if ($value !== null && trim((string) $value) !== '' && $value !== false) {
+            $answered++;
         }
     }
 

@@ -128,12 +128,38 @@ form { margin-top: 24px; }
     backdrop-filter: blur(14px);
 }
 
+.nested-section {
+    margin-top: 12px;
+    border: 1px solid rgba(28, 36, 48, 0.08);
+    border-left: 3px solid rgba(31, 75, 153, 0.24);
+    border-radius: 16px;
+    padding: 14px;
+    background: rgba(255, 255, 255, 0.72);
+}
+
+.nested-depth-2 {
+    margin-left: 12px;
+}
+
+.nested-depth-3 {
+    margin-left: 20px;
+}
+
+.nested-depth-4 {
+    margin-left: 28px;
+}
+
 .section-title {
     margin: 0 0 12px;
     font-family: "Iowan Old Style", Georgia, serif;
     font-size: 28px;
     color: #101828;
     letter-spacing: -0.03em;
+}
+
+.nested-section .section-title {
+    font-size: 20px;
+    margin-bottom: 8px;
 }
 
 .section-head {
@@ -315,6 +341,9 @@ canvas {
 @media (max-width: 720px) {
     .container { width: min(100% - 20px, 1120px); }
     .sheet, .hero { padding: 20px; border-radius: 22px; }
+    .nested-depth-2,
+    .nested-depth-3,
+    .nested-depth-4 { margin-left: 8px; }
     .section-title { font-size: 22px; }
     .status-row { padding: 12px; }
     .submit-wrap { position: static; }

@@ -62,11 +62,44 @@ body {
     backdrop-filter: blur(8px);
 }
 
+.nested-section {
+    margin-top: 10px;
+    border: 1px solid rgba(28, 36, 48, 0.08);
+    border-left: 3px solid rgba(31, 75, 153, 0.24);
+    border-radius: 16px;
+    padding: 12px;
+    background: rgba(255, 255, 255, 0.72);
+}
+
+.nested-depth-2 {
+    margin-left: 10px;
+}
+
+.nested-depth-3 {
+    margin-left: 18px;
+}
+
+.nested-depth-4 {
+    margin-left: 26px;
+}
+
 .section-title {
     margin: 0 0 14px;
     font-family: "Iowan Old Style", Georgia, serif;
     color: #101828;
     letter-spacing: -0.03em;
+}
+
+.nested-section .section-title {
+    font-size: 22px;
+    margin-bottom: 10px;
+}
+
+.section-desc {
+    margin: 0 0 10px;
+    color: #667085;
+    line-height: 1.5;
+    font-size: 13px;
 }
 
 .section-label {
@@ -169,5 +202,8 @@ textarea {
     .container { width: min(100% - 20px, 1080px); }
     .hero,
     .sheet { padding: 16px; border-radius: 16px; }
+    .nested-depth-2,
+    .nested-depth-3,
+    .nested-depth-4 { margin-left: 6px; }
     .submit-wrap { position: static; }
 }

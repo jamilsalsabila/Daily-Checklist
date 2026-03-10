@@ -36,27 +36,51 @@ function response_completion(array $schema, array $responses): string
 {
     $answered = 0;
     $total = 0;
-    foreach ($schema['sections'] as $section) {
-        foreach ($section['fields'] as $field) {
-            $fieldId = (string) ($field['id'] ?? '');
-            if ($fieldId === '') {
-                continue;
-            }
-            $total++;
-            $value = $responses[$fieldId] ?? null;
-            if (is_array($value)) {
-                if ($value !== []) {
-                    $answered++;
-                }
-                continue;
-            }
-            if ($value !== null && trim((string) $value) !== '' && $value !== false) {
+    foreach (TemplateSchema::allFields($schema) as $field) {
+        $fieldId = (string) ($field['id'] ?? '');
+        if ($fieldId === '') {
+            continue;
+        }
+        $total++;
+        $value = $responses[$fieldId] ?? null;
+        if (is_array($value)) {
+            if ($value !== []) {
                 $answered++;
             }
+            continue;
+        }
+        if ($value !== null && trim((string) $value) !== '' && $value !== false) {
+            $answered++;
         }
     }
 
     return $total > 0 ? $answered . '/' . $total : '0/0';
+}
+
+function render_admin_section_detail(array $section, array $responses, int $depth = 0): string
+{
+    $html = '';
+    $title = trim((string) ($section['title'] ?? ''));
+    $headingLevel = min(6, 4 + $depth);
+    if ($title !== '') {
+        $html .= '<h' . $headingLevel . render_text_style_attr($section['title_style'] ?? []) . '>' . e($title) . '</h' . $headingLevel . '>';
+    }
+    foreach ((array) ($section['fields'] ?? []) as $field) {
+        if (!is_array($field)) {
+            continue;
+        }
+        $value = $responses[$field['id']] ?? null;
+        $html .= '<p><strong' . render_text_style_attr($field['label_style'] ?? []) . '>'
+            . e((string) ($field['label'] ?? '')) . ':</strong> '
+            . e(TemplateSchema::responseDisplayValue($field, $value))
+            . '</p>';
+    }
+    foreach ((array) ($section['children'] ?? []) as $child) {
+        if (is_array($child)) {
+            $html .= render_admin_section_detail($child, $responses, $depth + 1);
+        }
+    }
+    return $html;
 }
 
 $initialState = [
@@ -260,14 +284,7 @@ $initialState = [
                         <div class="detail-card">
                             <h3>Isi Form</h3>
                             <?php foreach (($selectedSchema['sections'] ?? []) as $section): ?>
-                                <?php $sectionTitle = trim((string) ($section['title'] ?? '')); ?>
-                                <?php if ($sectionTitle !== ''): ?>
-                                    <h4<?= render_text_style_attr($section['title_style'] ?? []) ?>><?= e($sectionTitle) ?></h4>
-                                <?php endif; ?>
-                                <?php foreach (($section['fields'] ?? []) as $field): ?>
-                                    <?php $value = $selected['responses'][$field['id']] ?? null; ?>
-                                    <p><strong<?= render_text_style_attr($field['label_style'] ?? []) ?>><?= e((string) ($field['label'] ?? '')) ?>:</strong> <?= e(TemplateSchema::responseDisplayValue($field, $value)) ?></p>
-                                <?php endforeach; ?>
+                                <?= render_admin_section_detail($section, $selected['responses'] ?? []) ?>
                             <?php endforeach; ?>
                         </div>
 

@@ -27,14 +27,16 @@ function generate_submission_pdf(array $submission): string
     $pdf->addParagraph('Floor Captain: ' . ($submission['floor_captain'] ?? '-'), 10, 'sans_bold', 6);
     $pdf->addDivider();
 
-    foreach ($schema['sections'] as $sectionIndex => $section) {
+    $renderPdfSection = static function (array $section, string $indexPrefix = '') use (&$renderPdfSection, $pdf, $responses): void {
         $sectionTitle = trim((string) ($section['title'] ?? ''));
         if ($sectionTitle !== '') {
-            $pdf->addSection(($sectionIndex + 1) . '. ' . $sectionTitle);
+            $title = $indexPrefix !== '' ? $indexPrefix . '. ' . $sectionTitle : $sectionTitle;
+            $pdf->addSection($title);
         } else {
             $pdf->addSpacer(2);
         }
-        foreach ($section['fields'] as $field) {
+
+        foreach ((array) ($section['fields'] ?? []) as $field) {
             $fieldId = (string) ($field['id'] ?? '');
             $type = (string) ($field['type'] ?? 'single_line_text');
             $label = (string) ($field['label'] ?? $fieldId);
@@ -47,7 +49,22 @@ function generate_submission_pdf(array $submission): string
 
             $pdf->addStatusItem($label, TemplateSchema::responseDisplayValue($field, $value));
         }
+
+        $children = is_array($section['children'] ?? null) ? $section['children'] : [];
+        foreach ($children as $childIndex => $childSection) {
+            if (!is_array($childSection)) {
+                continue;
+            }
+            $childPrefix = $indexPrefix !== ''
+                ? $indexPrefix . '.' . ($childIndex + 1)
+                : (string) ($childIndex + 1);
+            $renderPdfSection($childSection, $childPrefix);
+        }
         $pdf->addSpacer(6);
+    };
+
+    foreach ($schema['sections'] as $sectionIndex => $section) {
+        $renderPdfSection($section, (string) ($sectionIndex + 1));
     }
 
     $pdf->addSection('Persetujuan');

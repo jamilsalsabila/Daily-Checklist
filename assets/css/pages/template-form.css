@@ -174,6 +174,26 @@ body {
     font-size: 13px;
 }
 
+.preview-section .preview-section {
+    margin-top: 6px;
+}
+
+.preview-depth-1 {
+    margin-left: 10px;
+}
+
+.preview-depth-2 {
+    margin-left: 18px;
+}
+
+.preview-depth-3 {
+    margin-left: 26px;
+}
+
+.preview-depth-4 {
+    margin-left: 34px;
+}
+
 .preview-field {
     display: grid;
     gap: 4px;
@@ -291,6 +311,29 @@ body {
     gap: 6px;
 }
 
+.opening-card.depth-1,
+.opening-card.depth-2,
+.opening-card.depth-3,
+.opening-card.depth-4 {
+    margin-left: 14px;
+    border-left: 2px solid rgba(31, 75, 153, 0.22);
+}
+
+.opening-card.depth-2,
+.opening-card.depth-3,
+.opening-card.depth-4 {
+    margin-left: 22px;
+}
+
+.opening-card.depth-3,
+.opening-card.depth-4 {
+    margin-left: 30px;
+}
+
+.opening-card.depth-4 {
+    margin-left: 38px;
+}
+
 .opening-card-head {
     display: grid;
     grid-template-columns: minmax(0, 1fr) minmax(140px, 0.35fr) auto;
@@ -312,6 +355,17 @@ body {
 
 .nested-list .field-card .builder-row.builder-row-handle {
     grid-template-columns: 96px minmax(0, 1fr) minmax(120px, 0.35fr) auto;
+}
+
+.section-children-list {
+    display: grid;
+    gap: 6px;
+}
+
+.section-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
 }
 
 .drag-handle {
@@ -413,6 +467,12 @@ body {
     }
     .nested-list .field-card .builder-row.builder-row-handle {
         grid-template-columns: 1fr;
+    }
+    .opening-card.depth-1,
+    .opening-card.depth-2,
+    .opening-card.depth-3,
+    .opening-card.depth-4 {
+        margin-left: 8px;
     }
     .style-inline {
         grid-template-columns: 1fr 1fr;

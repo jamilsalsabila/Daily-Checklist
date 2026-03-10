@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 final class TemplateSchema
 {
+    private const MAX_SECTION_DEPTH = 6;
     private const ALLOWED_TYPES = [
         'single_line_text',
         'long_text',
@@ -148,32 +149,30 @@ final class TemplateSchema
     public static function collectResponsesFromPost(array $schema, array $posted): array
     {
         $responses = [];
-        foreach ($schema['sections'] as $section) {
-            foreach ($section['fields'] as $field) {
-                $fieldId = (string) $field['id'];
-                $type = (string) $field['type'];
-                $value = $posted[$fieldId] ?? null;
+        foreach (self::allFields($schema) as $field) {
+            $fieldId = (string) $field['id'];
+            $type = (string) $field['type'];
+            $value = $posted[$fieldId] ?? null;
 
-                switch ($type) {
-                    case 'checkbox':
-                        $responses[$fieldId] = $value !== null && $value !== '';
-                        break;
-                    case 'multi_select':
-                        $items = is_array($value) ? $value : [];
-                        $allowed = array_map('strval', (array) ($field['options'] ?? []));
-                        $responses[$fieldId] = array_values(array_values(array_filter(
-                            array_map('strval', $items),
-                            static fn (string $item): bool => in_array($item, $allowed, true)
-                        )));
-                        break;
-                    case 'number':
-                        $raw = trim((string) $value);
-                        $responses[$fieldId] = $raw === '' ? '' : $raw;
-                        break;
-                    default:
-                        $responses[$fieldId] = trim((string) $value);
-                        break;
-                }
+            switch ($type) {
+                case 'checkbox':
+                    $responses[$fieldId] = $value !== null && $value !== '';
+                    break;
+                case 'multi_select':
+                    $items = is_array($value) ? $value : [];
+                    $allowed = array_map('strval', (array) ($field['options'] ?? []));
+                    $responses[$fieldId] = array_values(array_values(array_filter(
+                        array_map('strval', $items),
+                        static fn (string $item): bool => in_array($item, $allowed, true)
+                    )));
+                    break;
+                case 'number':
+                    $raw = trim((string) $value);
+                    $responses[$fieldId] = $raw === '' ? '' : $raw;
+                    break;
+                default:
+                    $responses[$fieldId] = trim((string) $value);
+                    break;
             }
         }
 
@@ -215,34 +214,32 @@ final class TemplateSchema
     public static function missingRequiredFields(array $schema, array $responses): array
     {
         $missing = [];
-        foreach ($schema['sections'] as $section) {
-            foreach ($section['fields'] as $field) {
-                if (empty($field['required'])) {
+        foreach (self::allFields($schema) as $field) {
+            if (empty($field['required'])) {
+                continue;
+            }
+            $fieldId = (string) ($field['id'] ?? '');
+            if ($fieldId === '') {
+                continue;
+            }
+            $value = $responses[$fieldId] ?? null;
+            $type = (string) ($field['type'] ?? 'single_line_text');
+            if ($type === 'checkbox') {
+                if (!empty($value)) {
                     continue;
                 }
-                $fieldId = (string) ($field['id'] ?? '');
-                if ($fieldId === '') {
+                $missing[] = $fieldId;
+                continue;
+            }
+            if ($type === 'multi_select') {
+                if (is_array($value) && $value !== []) {
                     continue;
                 }
-                $value = $responses[$fieldId] ?? null;
-                $type = (string) ($field['type'] ?? 'single_line_text');
-                if ($type === 'checkbox') {
-                    if (!empty($value)) {
-                        continue;
-                    }
-                    $missing[] = $fieldId;
-                    continue;
-                }
-                if ($type === 'multi_select') {
-                    if (is_array($value) && $value !== []) {
-                        continue;
-                    }
-                    $missing[] = $fieldId;
-                    continue;
-                }
-                if (trim((string) $value) === '') {
-                    $missing[] = $fieldId;
-                }
+                $missing[] = $fieldId;
+                continue;
+            }
+            if (trim((string) $value) === '') {
+                $missing[] = $fieldId;
             }
         }
 
@@ -252,13 +249,16 @@ final class TemplateSchema
     public static function responsesFromLegacy(array $schema, array $submission): array
     {
         $responses = [];
-        foreach ($schema['sections'] as $section) {
-            foreach ($section['fields'] as $field) {
-                $fieldId = (string) $field['id'];
-                $responses[$fieldId] = self::legacyValueForField($submission, $field);
-            }
+        foreach (self::allFields($schema) as $field) {
+            $fieldId = (string) $field['id'];
+            $responses[$fieldId] = self::legacyValueForField($submission, $field);
         }
         return $responses;
+    }
+
+    public static function allFields(array $schema): array
+    {
+        return self::flattenFields($schema);
     }
 
     public static function responseDisplayValue(array $field, mixed $value): string
@@ -306,46 +306,67 @@ final class TemplateSchema
             return self::defaults()['sections'];
         }
 
+        $seenSectionIds = [];
+        $seenFieldIds = [];
+        $sections = self::normalizeSectionLevel($value, 1, $seenSectionIds, $seenFieldIds, 'section');
+        return $sections !== [] ? $sections : self::defaults()['sections'];
+    }
+
+    private static function normalizeSectionLevel(
+        array $rawSections,
+        int $depth,
+        array &$seenSectionIds,
+        array &$seenFieldIds,
+        string $parentKey
+    ): array {
+        if ($depth > self::MAX_SECTION_DEPTH) {
+            return [];
+        }
+
         $sections = [];
-        $seenIds = [];
-        foreach ($value as $index => $sectionRaw) {
+        foreach ($rawSections as $index => $sectionRaw) {
             if (!is_array($sectionRaw)) {
                 continue;
             }
 
-            $sectionId = self::sanitizeKey((string) ($sectionRaw['id'] ?? ''), 'section_' . ($index + 1));
-            while (isset($seenIds[$sectionId])) {
+            $fallbackId = ($parentKey !== '' ? $parentKey . '_' : 'section_') . ($index + 1);
+            $sectionId = self::sanitizeKey((string) ($sectionRaw['id'] ?? ''), $fallbackId);
+            while (isset($seenSectionIds[$sectionId])) {
                 $sectionId .= '_' . ($index + 1);
             }
-            $seenIds[$sectionId] = true;
+            $seenSectionIds[$sectionId] = true;
 
             $title = trim((string) ($sectionRaw['title'] ?? ''));
             $description = trim((string) ($sectionRaw['description'] ?? ''));
-            $fields = self::normalizeFields($sectionRaw['fields'] ?? [], $sectionId);
-            if ($fields === []) {
+            $fields = self::normalizeFields($sectionRaw['fields'] ?? [], $sectionId, $seenFieldIds);
+            $children = self::normalizeSectionLevel((array) ($sectionRaw['children'] ?? []), $depth + 1, $seenSectionIds, $seenFieldIds, $sectionId);
+            if ($fields === [] && $children === []) {
                 continue;
             }
 
-            $sections[] = [
+            $normalizedSection = [
                 'id' => $sectionId,
                 'title' => $title,
                 'description' => $description,
                 'title_style' => self::normalizeTextStyle($sectionRaw['title_style'] ?? []),
                 'fields' => $fields,
             ];
+            if ($children !== []) {
+                $normalizedSection['children'] = $children;
+            }
+            $sections[] = $normalizedSection;
         }
 
-        return $sections !== [] ? $sections : self::defaults()['sections'];
+        return $sections;
     }
 
-    private static function normalizeFields(mixed $value, string $sectionId): array
+    private static function normalizeFields(mixed $value, string $sectionId, array &$seenFieldIds): array
     {
         if (!is_array($value)) {
             return [];
         }
 
         $fields = [];
-        $seenIds = [];
         foreach ($value as $index => $fieldRaw) {
             if (!is_array($fieldRaw)) {
                 continue;
@@ -357,10 +378,10 @@ final class TemplateSchema
             }
 
             $fieldId = self::sanitizeKey((string) ($fieldRaw['id'] ?? ''), $sectionId . '_field_' . ($index + 1));
-            while (isset($seenIds[$fieldId])) {
+            while (isset($seenFieldIds[$fieldId])) {
                 $fieldId .= '_' . ($index + 1);
             }
-            $seenIds[$fieldId] = true;
+            $seenFieldIds[$fieldId] = true;
 
             $label = trim((string) ($fieldRaw['label'] ?? ''));
             if ($label === '') {
@@ -400,12 +421,25 @@ final class TemplateSchema
     private static function flattenFields(array $schema): array
     {
         $fields = [];
-        foreach ($schema['sections'] ?? [] as $section) {
-            foreach ($section['fields'] ?? [] as $field) {
-                $fields[] = $field;
+        self::flattenFieldsFromSections((array) ($schema['sections'] ?? []), $fields);
+        return $fields;
+    }
+
+    private static function flattenFieldsFromSections(array $sections, array &$fields): void
+    {
+        foreach ($sections as $section) {
+            if (!is_array($section)) {
+                continue;
+            }
+            foreach ((array) ($section['fields'] ?? []) as $field) {
+                if (is_array($field)) {
+                    $fields[] = $field;
+                }
+            }
+            if (is_array($section['children'] ?? null)) {
+                self::flattenFieldsFromSections($section['children'], $fields);
             }
         }
-        return $fields;
     }
 
     private static function legacyToGenericSchema(array $legacy): array
