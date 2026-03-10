@@ -65,3 +65,49 @@ function pdf_file_path(string $code): string
 
     return $directory . '/' . $code . '.pdf';
 }
+
+function render_text_style_attr(mixed $style): string
+{
+    if (!is_array($style)) {
+        return '';
+    }
+
+    $fontMap = [
+        'default' => 'inherit',
+        'sans' => '"Avenir Next", Avenir, "Segoe UI", sans-serif',
+        'serif' => '"Iowan Old Style", Georgia, serif',
+        'mono' => '"Courier New", ui-monospace, monospace',
+    ];
+
+    $css = [];
+    $fontFamily = (string) ($style['font_family'] ?? '');
+    if (isset($fontMap[$fontFamily])) {
+        $css[] = 'font-family:' . $fontMap[$fontFamily];
+    }
+
+    $fontSize = (int) ($style['font_size'] ?? 0);
+    if ($fontSize >= 10 && $fontSize <= 56) {
+        $css[] = 'font-size:' . $fontSize . 'px';
+    }
+
+    if (!empty($style['bold'])) {
+        $css[] = 'font-weight:700';
+    }
+    if (!empty($style['italic'])) {
+        $css[] = 'font-style:italic';
+    }
+    if (!empty($style['underline'])) {
+        $css[] = 'text-decoration:underline';
+    }
+
+    $color = trim((string) ($style['color'] ?? ''));
+    if (preg_match('/^#[0-9a-fA-F]{6}$/', $color) === 1) {
+        $css[] = 'color:' . strtolower($color);
+    }
+
+    if ($css === []) {
+        return '';
+    }
+
+    return ' style="' . e(implode(';', $css)) . '"';
+}

@@ -5,6 +5,7 @@ declare(strict_types=1);
 require_once __DIR__ . '/app/bootstrap.php';
 
 $code = (string) ($_GET['code'] ?? '');
+$templateSlug = trim((string) ($_GET['template'] ?? ''));
 $submission = $database->findSubmissionByCode($code);
 
 if ($submission === null) {
@@ -61,11 +62,12 @@ $emailError = trim((string) ($_GET['email_error'] ?? ''));
         <div class="actions">
             <a class="btn btn-primary" href="pdf.php?code=<?= urlencode($submission['submission_code']) ?>" target="_blank" rel="noopener">Lihat / Download PDF</a>
             <a class="btn btn-secondary" href="https://wa.me/?text=<?= $waMessage ?>" target="_blank" rel="noopener">Bagikan ke WhatsApp</a>
-            <a class="btn btn-secondary" href="index.php">Isi form baru</a>
+            <a class="btn btn-secondary" href="index.php<?= $templateSlug !== '' ? '?template=' . urlencode($templateSlug) : '' ?>">Isi form baru</a>
         </div>
 
         <form action="email.php" method="post">
             <input type="hidden" name="code" value="<?= e($submission['submission_code']) ?>">
+            <input type="hidden" name="template" value="<?= e($templateSlug) ?>">
             <label>
                 <span>Kirim PDF ke email</span>
                 <input type="email" name="recipient_email" required placeholder="nama@email.com">

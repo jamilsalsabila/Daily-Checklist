@@ -9,68 +9,56 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') !== 'POST') {
     exit;
 }
 
-$tanggal = trim((string) ($_POST['tanggal'] ?? ''));
-$floorCaptain = trim((string) ($_POST['floor_captain'] ?? ''));
 $signatureStrokesRaw = (string) ($_POST['signature_strokes'] ?? '');
 $signaturePreview = (string) ($_POST['signature_preview'] ?? '');
+$templateIdRaw = trim((string) ($_POST['template_id'] ?? ''));
+$templateVersionIdRaw = trim((string) ($_POST['template_version_id'] ?? ''));
+$templateSlug = trim((string) ($_POST['template_slug'] ?? ''));
 
 $signatureStrokes = json_decode($signatureStrokesRaw, true);
+$templateId = ctype_digit($templateIdRaw) ? (int) $templateIdRaw : null;
+$templateVersionId = ctype_digit($templateVersionIdRaw) ? (int) $templateVersionIdRaw : null;
 
-if ($tanggal === '' || $floorCaptain === '' || !is_array($signatureStrokes) || $signatureStrokes === [] || $signaturePreview === '') {
+if (!is_array($signatureStrokes) || $signatureStrokes === [] || $signaturePreview === '') {
     http_response_code(422);
     echo 'Data wajib belum lengkap. Silakan kembali dan lengkapi form.';
     exit;
 }
 
-$openingChecks = [];
-foreach (FormDefinition::openingSections() as $section) {
-    $posted = $_POST['opening_checks'][$section['key']] ?? [];
-    $values = [];
-    foreach ($section['items'] as $index => $_) {
-        $values[$index] = isset($posted[$index]) ? 1 : 0;
-    }
-    $openingChecks[$section['key']] = $values;
+$activeTemplate = null;
+if ($templateSlug !== '') {
+    $activeTemplate = $database->findTemplateBySlug($templateSlug, true);
 }
-
-$teamControl = [];
-foreach (FormDefinition::teamControlItems() as $key => $_) {
-    $teamControl[$key] = (string) ($_POST['team_control'][$key] ?? '');
+if ($activeTemplate === null) {
+    $activeTemplate = $database->getActiveTemplate();
 }
-
-$serviceControl = [];
-foreach (FormDefinition::serviceControlItems() as $key => $_) {
-    $serviceControl[$key] = (string) ($_POST['service_control'][$key] ?? '');
+$schema = TemplateSchema::fromTemplate($activeTemplate);
+$templateId = (int) ($activeTemplate['id'] ?? $templateId ?? 0) ?: $templateId;
+$templateVersionId = (int) ($activeTemplate['current_version_id'] ?? $templateVersionId ?? 0) ?: $templateVersionId;
+$responses = TemplateSchema::collectResponsesFromPost($schema, (array) ($_POST['responses'] ?? []));
+$missingRequired = TemplateSchema::missingRequiredFields($schema, $responses);
+if ($missingRequired !== []) {
+    http_response_code(422);
+    echo 'Masih ada field wajib yang belum diisi.';
+    exit;
 }
-
-$floorAwareness = [];
-foreach (FormDefinition::floorAwarenessItems() as $key => $_) {
-    $floorAwareness[$key] = (string) ($_POST['floor_awareness'][$key] ?? '');
-}
-
-$closingControl = [];
-foreach (FormDefinition::closingControlItems() as $key => $_) {
-    $closingControl[$key] = isset($_POST['closing_control'][$key]) ? 1 : 0;
-}
+$meta = TemplateSchema::deriveMeta($schema, $responses);
 
 $payload = [
-    'tanggal' => $tanggal,
-    'floor_captain' => $floorCaptain,
-    'opening_checks' => $openingChecks,
-    'team_control' => $teamControl,
-    'service_control' => $serviceControl,
-    'floor_awareness' => $floorAwareness,
-    'customer_experience' => [
-        'ada_komplain' => (string) ($_POST['customer_experience']['ada_komplain'] ?? ''),
-        'jenis_komplain' => trim((string) ($_POST['customer_experience']['jenis_komplain'] ?? '')),
-        'ditangani_oleh' => trim((string) ($_POST['customer_experience']['ditangani_oleh'] ?? '')),
-    ],
-    'closing_control' => $closingControl,
-    'operational_notes' => [
-        'masalah_hari_ini' => trim((string) ($_POST['operational_notes']['masalah_hari_ini'] ?? '')),
-        'perbaikan' => trim((string) ($_POST['operational_notes']['perbaikan'] ?? '')),
-    ],
+    'tanggal' => $meta['tanggal'],
+    'floor_captain' => $meta['floor_captain'],
+    'opening_checks' => [],
+    'team_control' => [],
+    'service_control' => [],
+    'floor_awareness' => [],
+    'customer_experience' => [],
+    'closing_control' => [],
+    'operational_notes' => [],
+    'responses' => $responses,
     'signature_strokes' => $signatureStrokes,
     'signature_preview' => $signaturePreview,
+    'template_id' => $templateId,
+    'template_version_id' => $templateVersionId,
 ];
 
 try {
@@ -81,7 +69,11 @@ try {
         save_submission_pdf($submission);
     }
 
-    header('Location: thank-you.php?code=' . urlencode($code));
+    $redirect = 'thank-you.php?code=' . urlencode($code);
+    if ($templateSlug !== '') {
+        $redirect .= '&template=' . urlencode($templateSlug);
+    }
+    header('Location: ' . $redirect);
     exit;
 } catch (Throwable $exception) {
     http_response_code(500);

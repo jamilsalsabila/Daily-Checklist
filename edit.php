@@ -13,6 +13,55 @@ if ($submission === null) {
     echo 'Submission tidak ditemukan.';
     exit;
 }
+
+$schema = TemplateSchema::fromSubmission($database, $submission);
+$responses = is_array($submission['responses'] ?? null) ? $submission['responses'] : [];
+
+function render_edit_field_input(array $field, mixed $value = null): string
+{
+    $fieldId = (string) ($field['id'] ?? '');
+    $type = (string) ($field['type'] ?? 'single_line_text');
+    $required = !empty($field['required']) ? ' required' : '';
+    $placeholder = e((string) ($field['placeholder'] ?? ''));
+    $name = 'responses[' . $fieldId . ']';
+
+    if ($type === 'long_text') {
+        return '<textarea name="' . e($name) . '" placeholder="' . $placeholder . '"' . $required . '>' . e((string) $value) . '</textarea>';
+    }
+    if ($type === 'checkbox') {
+        $checked = !empty($value) ? ' checked' : '';
+        return '<input type="checkbox" name="' . e($name) . '" value="1"' . $checked . $required . '>';
+    }
+    if ($type === 'single_select') {
+        $html = '<div class="status-options">';
+        foreach ((array) ($field['options'] ?? []) as $option) {
+            $optionText = (string) $option;
+            $checked = (string) $value === $optionText ? ' checked' : '';
+            $html .= '<label><input type="radio" name="' . e($name) . '" value="' . e($optionText) . '"' . $checked . $required . '> ' . e(ucwords(str_replace('_', ' ', $optionText))) . '</label>';
+        }
+        $html .= '</div>';
+        return $html;
+    }
+    if ($type === 'multi_select') {
+        $values = is_array($value) ? array_map('strval', $value) : [];
+        $html = '<div class="status-options">';
+        foreach ((array) ($field['options'] ?? []) as $option) {
+            $optionText = (string) $option;
+            $checked = in_array($optionText, $values, true) ? ' checked' : '';
+            $html .= '<label><input type="checkbox" name="' . e($name) . '[]" value="' . e($optionText) . '"' . $checked . '> ' . e(ucwords(str_replace('_', ' ', $optionText))) . '</label>';
+        }
+        $html .= '</div>';
+        return $html;
+    }
+
+    $inputType = match ($type) {
+        'date' => 'date',
+        'number' => 'number',
+        'time' => 'time',
+        default => 'text',
+    };
+    return '<input type="' . $inputType . '" name="' . e($name) . '" value="' . e((string) $value) . '" placeholder="' . $placeholder . '"' . $required . '>';
+}
 ?>
 <!doctype html>
 <html lang="id">
@@ -35,7 +84,7 @@ if ($submission === null) {
         <section class="hero">
             <div>
                 <h1>Edit Submission</h1>
-                <p>Kode: <?= e($submission['submission_code']) ?>. Ubah data yang diperlukan, lalu simpan.</p>
+                <p>Kode: <?= e($submission['submission_code']) ?>.</p>
             </div>
         </section>
 
@@ -43,126 +92,28 @@ if ($submission === null) {
             <input type="hidden" name="code" value="<?= e($submission['submission_code']) ?>">
             <input type="hidden" name="csrf_token" value="<?= e(csrf_token()) ?>">
 
-            <section class="sheet">
-                <h2 class="section-title">Data Utama</h2>
-                <div class="grid grid-2">
-                    <label class="meta">
-                        <span>Tanggal</span>
-                        <input type="date" name="tanggal" required value="<?= e($submission['tanggal']) ?>">
-                    </label>
-                    <label class="meta">
-                        <span>Floor Captain</span>
-                        <input type="text" name="floor_captain" required value="<?= e($submission['floor_captain']) ?>">
-                    </label>
-                </div>
-            </section>
-
-            <section class="sheet">
-                <h2 class="section-title">Opening Control</h2>
-                <?php foreach (FormDefinition::openingSections() as $section): ?>
-                    <h3 class="section-label"><?= e($section['title']) ?></h3>
-                    <div class="card checklist">
-                        <?php foreach ($section['items'] as $index => $item): ?>
-                            <label class="check-item">
-                                <input type="checkbox" name="opening_checks[<?= e($section['key']) ?>][<?= $index ?>]" value="1" <?= !empty($submission['opening_checks'][$section['key']][$index]) ? 'checked' : '' ?>>
-                                <span><?= e($item) ?></span>
-                            </label>
+            <?php foreach ($schema['sections'] as $section): ?>
+                <section class="sheet">
+                    <h2 class="section-title"<?= render_text_style_attr($section['title_style'] ?? []) ?>><?= e((string) ($section['title'] ?? 'Section')) ?></h2>
+                    <div class="grid">
+                        <?php foreach ($section['fields'] as $field): ?>
+                            <?php $type = (string) ($field['type'] ?? 'single_line_text'); ?>
+                            <?php $value = $responses[$field['id']] ?? null; ?>
+                            <?php if ($type === 'checkbox'): ?>
+                                <label class="check-item">
+                                    <?= render_edit_field_input($field, $value) ?>
+                                    <span<?= render_text_style_attr($field['label_style'] ?? []) ?>><?= e((string) ($field['label'] ?? '')) ?></span>
+                                </label>
+                            <?php else: ?>
+                                <label class="meta">
+                                    <span<?= render_text_style_attr($field['label_style'] ?? []) ?>><?= e((string) ($field['label'] ?? '')) ?></span>
+                                    <?= render_edit_field_input($field, $value) ?>
+                                </label>
+                            <?php endif; ?>
                         <?php endforeach; ?>
                     </div>
-                <?php endforeach; ?>
-            </section>
-
-            <section class="sheet">
-                <h2 class="section-title">Team Control</h2>
-                <div class="grid">
-                    <?php foreach (FormDefinition::teamControlItems() as $key => $label): ?>
-                        <div class="status-row">
-                            <strong><?= e($label) ?></strong>
-                            <div class="status-options">
-                                <label><input type="radio" name="team_control[<?= e($key) ?>]" value="ya" required <?= (($submission['team_control'][$key] ?? '') === 'ya') ? 'checked' : '' ?>> Ya</label>
-                                <label><input type="radio" name="team_control[<?= e($key) ?>]" value="tidak" required <?= (($submission['team_control'][$key] ?? '') === 'tidak') ? 'checked' : '' ?>> Tidak</label>
-                            </div>
-                        </div>
-                    <?php endforeach; ?>
-                </div>
-            </section>
-
-            <section class="sheet">
-                <h2 class="section-title">Service Control</h2>
-                <div class="grid">
-                    <?php foreach (FormDefinition::serviceControlItems() as $key => $label): ?>
-                        <div class="status-row">
-                            <strong><?= e($label) ?></strong>
-                            <div class="status-options">
-                                <label><input type="radio" name="service_control[<?= e($key) ?>]" value="ya" required <?= (($submission['service_control'][$key] ?? '') === 'ya') ? 'checked' : '' ?>> Ya</label>
-                                <label><input type="radio" name="service_control[<?= e($key) ?>]" value="tidak" required <?= (($submission['service_control'][$key] ?? '') === 'tidak') ? 'checked' : '' ?>> Tidak</label>
-                            </div>
-                        </div>
-                    <?php endforeach; ?>
-                </div>
-            </section>
-
-            <section class="sheet">
-                <h2 class="section-title">Floor Awareness</h2>
-                <div class="grid">
-                    <?php foreach (FormDefinition::floorAwarenessItems() as $key => $label): ?>
-                        <div class="status-row">
-                            <strong><?= e($label) ?></strong>
-                            <div class="status-options">
-                                <label><input type="radio" name="floor_awareness[<?= e($key) ?>]" value="ya" required <?= (($submission['floor_awareness'][$key] ?? '') === 'ya') ? 'checked' : '' ?>> Ya</label>
-                                <label><input type="radio" name="floor_awareness[<?= e($key) ?>]" value="tidak" required <?= (($submission['floor_awareness'][$key] ?? '') === 'tidak') ? 'checked' : '' ?>> Tidak</label>
-                            </div>
-                        </div>
-                    <?php endforeach; ?>
-                </div>
-            </section>
-
-            <section class="sheet">
-                <h2 class="section-title">Customer Experience</h2>
-                <div class="grid">
-                    <div class="status-row">
-                        <strong>Ada komplain tamu hari ini</strong>
-                        <div class="status-options">
-                            <label><input type="radio" name="customer_experience[ada_komplain]" value="ada" required <?= (($submission['customer_experience']['ada_komplain'] ?? '') === 'ada') ? 'checked' : '' ?>> Ada</label>
-                            <label><input type="radio" name="customer_experience[ada_komplain]" value="tidak_ada" required <?= (($submission['customer_experience']['ada_komplain'] ?? '') === 'tidak_ada') ? 'checked' : '' ?>> Tidak ada</label>
-                        </div>
-                    </div>
-                    <label class="meta">
-                        <span>Jenis komplain</span>
-                        <textarea name="customer_experience[jenis_komplain]"><?= e((string) ($submission['customer_experience']['jenis_komplain'] ?? '')) ?></textarea>
-                    </label>
-                    <label class="meta">
-                        <span>Ditangani oleh</span>
-                        <textarea name="customer_experience[ditangani_oleh]"><?= e((string) ($submission['customer_experience']['ditangani_oleh'] ?? '')) ?></textarea>
-                    </label>
-                </div>
-            </section>
-
-            <section class="sheet">
-                <h2 class="section-title">Closing Control</h2>
-                <div class="card checklist">
-                    <?php foreach (FormDefinition::closingControlItems() as $key => $label): ?>
-                        <label class="check-item">
-                            <input type="checkbox" name="closing_control[<?= e($key) ?>]" value="1" <?= !empty($submission['closing_control'][$key]) ? 'checked' : '' ?>>
-                            <span><?= e($label) ?> (Ya)</span>
-                        </label>
-                    <?php endforeach; ?>
-                </div>
-            </section>
-
-            <section class="sheet">
-                <h2 class="section-title">Catatan Operasional</h2>
-                <div class="grid">
-                    <label class="meta">
-                        <span>Masalah hari ini</span>
-                        <textarea name="operational_notes[masalah_hari_ini]"><?= e((string) ($submission['operational_notes']['masalah_hari_ini'] ?? '')) ?></textarea>
-                    </label>
-                    <label class="meta">
-                        <span>Perbaikan</span>
-                        <textarea name="operational_notes[perbaikan]"><?= e((string) ($submission['operational_notes']['perbaikan'] ?? '')) ?></textarea>
-                    </label>
-                </div>
-            </section>
+                </section>
+            <?php endforeach; ?>
 
             <div class="submit-wrap">
                 <button class="btn btn-primary" type="submit">Simpan perubahan</button>

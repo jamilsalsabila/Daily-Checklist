@@ -281,6 +281,37 @@ canvas {
     line-height: 1.5;
 }
 
+.template-picker {
+    display: grid;
+    gap: 10px;
+}
+
+.template-pick {
+    display: grid;
+    gap: 6px;
+    border: 1px solid rgba(28, 36, 48, 0.08);
+    border-radius: 14px;
+    background: rgba(255, 255, 255, 0.84);
+    padding: 14px;
+    text-decoration: none;
+    color: inherit;
+}
+
+.template-pick strong {
+    color: var(--accent-dark);
+}
+
+.template-pick span {
+    color: #344054;
+    font-size: 14px;
+}
+
+.template-pick em {
+    color: var(--soft);
+    font-style: normal;
+    font-size: 12px;
+}
+
 @media (max-width: 720px) {
     .container { width: min(100% - 20px, 1120px); }
     .sheet, .hero { padding: 20px; border-radius: 22px; }

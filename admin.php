@@ -10,8 +10,16 @@ $filterSearch = trim((string) ($_GET['q'] ?? ''));
 $detailCode = trim((string) ($_GET['code'] ?? ''));
 $status = trim((string) ($_GET['status'] ?? ''));
 
+$templates = $database->listTemplates();
+$publishedTemplates = array_values(array_filter($templates, static fn (array $row): bool => (int) ($row['is_active'] ?? 0) === 1));
+$templateNamesById = [];
+foreach ($templates as $template) {
+    $templateNamesById[(int) $template['id']] = (string) ($template['name'] ?? 'Template');
+}
+
 $submissions = $database->listSubmissions($filterDate, $filterSearch);
 $selected = $detailCode !== '' ? $database->findSubmissionByCode($detailCode) : null;
+$selectedSchema = $selected !== null ? TemplateSchema::fromSubmission($database, $selected) : null;
 $waMessage = '';
 
 if ($selected !== null) {
@@ -24,33 +32,31 @@ if ($selected !== null) {
     );
 }
 
-function opening_completion(array $submission): string
+function response_completion(array $schema, array $responses): string
 {
-    $checked = 0;
+    $answered = 0;
     $total = 0;
-    foreach ($submission['opening_checks'] ?? [] as $items) {
-        foreach ($items as $value) {
+    foreach ($schema['sections'] as $section) {
+        foreach ($section['fields'] as $field) {
+            $fieldId = (string) ($field['id'] ?? '');
+            if ($fieldId === '') {
+                continue;
+            }
             $total++;
-            if (!empty($value)) {
-                $checked++;
+            $value = $responses[$fieldId] ?? null;
+            if (is_array($value)) {
+                if ($value !== []) {
+                    $answered++;
+                }
+                continue;
+            }
+            if ($value !== null && trim((string) $value) !== '' && $value !== false) {
+                $answered++;
             }
         }
     }
 
-    return $total > 0 ? $checked . '/' . $total : '0/0';
-}
-
-function section_completion(array $values): string
-{
-    $total = count($values);
-    $checked = 0;
-    foreach ($values as $value) {
-        if (!empty($value)) {
-            $checked++;
-        }
-    }
-
-    return $checked . '/' . $total;
+    return $total > 0 ? $answered . '/' . $total : '0/0';
 }
 ?>
 <!doctype html>
@@ -87,7 +93,79 @@ function section_completion(array $values): string
             <div class="notice ok">Submission berhasil dihapus.</div>
         <?php elseif ($status === 'delete_failed'): ?>
             <div class="notice bad">Gagal menghapus submission.</div>
+        <?php elseif ($status === 'template_published'): ?>
+            <div class="notice ok">Template berhasil dipublikasikan.</div>
+        <?php elseif ($status === 'template_unpublished'): ?>
+            <div class="notice ok">Template berhasil dinonaktifkan dari publikasi.</div>
+        <?php elseif ($status === 'template_activate_failed'): ?>
+            <div class="notice bad">Gagal mengubah status publikasi template.</div>
+        <?php elseif ($status === 'csrf_error'): ?>
+            <div class="notice bad">Sesi keamanan tidak valid. Silakan ulangi.</div>
+        <?php elseif ($status === 'template_saved'): ?>
+            <div class="notice ok">Template berhasil disimpan.</div>
+        <?php elseif ($status === 'template_deleted'): ?>
+            <div class="notice ok">Template berhasil dihapus.</div>
+        <?php elseif ($status === 'template_delete_failed'): ?>
+            <div class="notice bad">Template tidak bisa dihapus (masih dipublikasikan atau sudah dipakai submission).</div>
+        <?php elseif ($status === 'template_save_failed'): ?>
+            <div class="notice bad">Gagal menyimpan template. Cek data input.</div>
         <?php endif; ?>
+
+        <section class="panel template-panel">
+            <div class="template-panel-head">
+                <h2>Checklist Template</h2>
+                <div class="template-head-actions">
+                    <?php if ($publishedTemplates !== []): ?>
+                        <span class="chip">Published: <?= e((string) count($publishedTemplates)) ?> template</span>
+                    <?php endif; ?>
+                    <a class="btn btn-edit" href="template-form.php">Template baru</a>
+                </div>
+            </div>
+            <div class="template-list">
+                <?php foreach ($templates as $template): ?>
+                    <?php $isPublished = (int) ($template['is_active'] ?? 0) === 1; ?>
+                    <article class="template-item<?= $isPublished ? ' active' : '' ?>">
+                        <div class="template-main">
+                            <strong><?= e((string) ($template['name'] ?? '-')) ?></strong>
+                            <span class="code"><?= e((string) ($template['slug'] ?? '-')) ?></span>
+                            <span class="muted">Versi: v<?= e((string) ($template['current_version'] ?? '-')) ?></span>
+                            <?php if ($isPublished): ?>
+                                <a class="muted template-link" target="_blank" rel="noopener" href="index.php?template=<?= urlencode((string) ($template['slug'] ?? '')) ?>">Form URL: /?template=<?= e((string) ($template['slug'] ?? '')) ?></a>
+                            <?php endif; ?>
+                        </div>
+                        <div class="template-action">
+                            <div class="template-button-row">
+                                <?php if ($isPublished): ?>
+                                    <form action="template-activate.php" method="post">
+                                        <input type="hidden" name="template_id" value="<?= e((string) ($template['id'] ?? '')) ?>">
+                                        <input type="hidden" name="action" value="unpublish">
+                                        <input type="hidden" name="csrf_token" value="<?= e(csrf_token()) ?>">
+                                        <button class="btn btn-ghost btn-small" type="submit">Nonaktifkan</button>
+                                    </form>
+                                <?php else: ?>
+                                    <form action="template-activate.php" method="post">
+                                        <input type="hidden" name="template_id" value="<?= e((string) ($template['id'] ?? '')) ?>">
+                                        <input type="hidden" name="action" value="publish">
+                                        <input type="hidden" name="csrf_token" value="<?= e(csrf_token()) ?>">
+                                        <button class="btn btn-edit" type="submit">Publikasikan</button>
+                                    </form>
+                                <?php endif; ?>
+
+                                <?php if (!$isPublished): ?>
+                                    <form action="template-delete.php" method="post" onsubmit="return confirm('Hapus template ini?');">
+                                        <input type="hidden" name="template_id" value="<?= e((string) ($template['id'] ?? '')) ?>">
+                                        <input type="hidden" name="csrf_token" value="<?= e(csrf_token()) ?>">
+                                        <button class="btn btn-delete" type="submit">Hapus</button>
+                                    </form>
+                                <?php endif; ?>
+
+                                <a class="btn btn-ghost btn-small" href="template-form.php?id=<?= urlencode((string) ($template['id'] ?? '')) ?>">Edit</a>
+                            </div>
+                        </div>
+                    </article>
+                <?php endforeach; ?>
+            </div>
+        </section>
 
         <div class="layout">
             <section class="panel">
@@ -121,6 +199,9 @@ function section_completion(array $values): string
                                 <span>Tanggal checklist: <?= e($item['tanggal']) ?></span>
                                 <span>Dibuat: <?= e(date('d M Y H:i', strtotime((string) $item['created_at']))) ?></span>
                             </div>
+                            <div class="row muted">
+                                <span>Template: <?= e($templateNamesById[(int) ($item['template_id'] ?? 0)] ?? '-') ?></span>
+                            </div>
                         </a>
                     <?php endforeach; ?>
                 </div>
@@ -135,8 +216,9 @@ function section_completion(array $values): string
                             <h3>Ringkasan</h3>
                             <p><strong>Floor Captain:</strong> <?= e($selected['floor_captain']) ?></p>
                             <p><strong>Tanggal:</strong> <?= e($selected['tanggal']) ?></p>
+                            <p><strong>Template:</strong> <?= e($templateNamesById[(int) ($selected['template_id'] ?? 0)] ?? '-') ?></p>
                             <div class="chips">
-                                <span class="chip">Opening <?= e(opening_completion($selected)) ?></span>
+                                <span class="chip">Terisi <?= e(response_completion($selectedSchema ?? ['sections' => []], $selected['responses'] ?? [])) ?></span>
                                 <span class="chip">Kode <?= e($selected['submission_code']) ?></span>
                             </div>
                             <p>
@@ -154,51 +236,14 @@ function section_completion(array $values): string
                         </div>
 
                         <div class="detail-card">
-                            <h3>Team Control</h3>
-                            <?php foreach (FormDefinition::teamControlItems() as $key => $label): ?>
-                                <p><strong><?= e($label) ?>:</strong> <?= e(strtoupper((string) ($selected['team_control'][$key] ?? '-'))) ?></p>
-                            <?php endforeach; ?>
-                        </div>
-
-                        <div class="detail-card">
-                            <h3>Opening Control</h3>
-                            <ul>
-                                <?php foreach (FormDefinition::openingSections() as $section): ?>
-                                    <li><?= e($section['title']) ?>: <?= e(section_completion($selected['opening_checks'][$section['key']] ?? [])) ?></li>
+                            <h3>Isi Form</h3>
+                            <?php foreach (($selectedSchema['sections'] ?? []) as $section): ?>
+                                <h4<?= render_text_style_attr($section['title_style'] ?? []) ?>><?= e((string) ($section['title'] ?? 'Section')) ?></h4>
+                                <?php foreach (($section['fields'] ?? []) as $field): ?>
+                                    <?php $value = $selected['responses'][$field['id']] ?? null; ?>
+                                    <p><strong<?= render_text_style_attr($field['label_style'] ?? []) ?>><?= e((string) ($field['label'] ?? '')) ?>:</strong> <?= e(TemplateSchema::responseDisplayValue($field, $value)) ?></p>
                                 <?php endforeach; ?>
-                            </ul>
-                        </div>
-
-                        <div class="detail-card">
-                            <h3>Service & Floor Awareness</h3>
-                            <?php foreach (FormDefinition::serviceControlItems() as $key => $label): ?>
-                                <p><strong><?= e($label) ?>:</strong> <?= e(strtoupper((string) ($selected['service_control'][$key] ?? '-'))) ?></p>
                             <?php endforeach; ?>
-                            <?php foreach (FormDefinition::floorAwarenessItems() as $key => $label): ?>
-                                <p><strong><?= e($label) ?>:</strong> <?= e(strtoupper((string) ($selected['floor_awareness'][$key] ?? '-'))) ?></p>
-                            <?php endforeach; ?>
-                        </div>
-
-                        <div class="detail-card">
-                            <h3>Customer Experience</h3>
-                            <p><strong>Status komplain:</strong> <?= e(strtoupper((string) ($selected['customer_experience']['ada_komplain'] ?? '-'))) ?></p>
-                            <p><strong>Jenis komplain:</strong> <?= e($selected['customer_experience']['jenis_komplain'] ?? '-') ?></p>
-                            <p><strong>Ditangani oleh:</strong> <?= e($selected['customer_experience']['ditangani_oleh'] ?? '-') ?></p>
-                        </div>
-
-                        <div class="detail-card">
-                            <h3>Closing Control</h3>
-                            <ul>
-                                <?php foreach (FormDefinition::closingControlItems() as $key => $label): ?>
-                                    <li><?= e($label) ?>: <?= !empty($selected['closing_control'][$key]) ? 'Ya' : 'Belum' ?></li>
-                                <?php endforeach; ?>
-                            </ul>
-                        </div>
-
-                        <div class="detail-card">
-                            <h3>Catatan Operasional</h3>
-                            <p><strong>Masalah hari ini:</strong> <?= e($selected['operational_notes']['masalah_hari_ini'] ?? '-') ?></p>
-                            <p><strong>Perbaikan:</strong> <?= e($selected['operational_notes']['perbaikan'] ?? '-') ?></p>
                         </div>
 
                         <div class="detail-card">

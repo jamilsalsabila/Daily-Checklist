@@ -12,9 +12,14 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') !== 'POST') {
 
 $code = trim((string) ($_POST['code'] ?? ''));
 $recipient = trim((string) ($_POST['recipient_email'] ?? ''));
+$templateSlug = trim((string) ($_POST['template'] ?? ''));
 
 if (!filter_var($recipient, FILTER_VALIDATE_EMAIL)) {
-    header('Location: thank-you.php?code=' . urlencode($code) . '&email_status=invalid');
+    $location = 'thank-you.php?code=' . urlencode($code) . '&email_status=invalid';
+    if ($templateSlug !== '') {
+        $location .= '&template=' . urlencode($templateSlug);
+    }
+    header('Location: ' . $location);
     exit;
 }
 
@@ -32,7 +37,11 @@ if (!is_file($path)) {
 
 $pdfData = file_get_contents($path);
 if ($pdfData === false) {
-    header('Location: thank-you.php?code=' . urlencode($code) . '&email_status=failed');
+    $location = 'thank-you.php?code=' . urlencode($code) . '&email_status=failed';
+    if ($templateSlug !== '') {
+        $location .= '&template=' . urlencode($templateSlug);
+    }
+    header('Location: ' . $location);
     exit;
 }
 
@@ -54,7 +63,11 @@ $mailer = new SmtpMailer([
 
 $error = null;
 if (!$mailer->isConfigured()) {
-    header('Location: thank-you.php?code=' . urlencode($code) . '&email_status=not_configured');
+    $location = 'thank-you.php?code=' . urlencode($code) . '&email_status=not_configured';
+    if ($templateSlug !== '') {
+        $location .= '&template=' . urlencode($templateSlug);
+    }
+    header('Location: ' . $location);
     exit;
 }
 
@@ -69,6 +82,9 @@ $sent = $mailer->sendWithAttachment(
 
 $status = $sent ? 'sent' : 'failed';
 $query = 'code=' . urlencode($code) . '&email_status=' . $status;
+if ($templateSlug !== '') {
+    $query .= '&template=' . urlencode($templateSlug);
+}
 if (!$sent && $error !== null && $error !== '') {
     $query .= '&email_error=' . urlencode($error);
 }

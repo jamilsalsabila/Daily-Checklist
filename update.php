@@ -17,10 +17,7 @@ if (!verify_csrf_token((string) ($_POST['csrf_token'] ?? ''))) {
 }
 
 $code = trim((string) ($_POST['code'] ?? ''));
-$tanggal = trim((string) ($_POST['tanggal'] ?? ''));
-$floorCaptain = trim((string) ($_POST['floor_captain'] ?? ''));
-
-if ($code === '' || $tanggal === '' || $floorCaptain === '') {
+if ($code === '') {
     http_response_code(422);
     echo 'Data wajib belum lengkap untuk update.';
     exit;
@@ -33,53 +30,27 @@ if ($existing === null) {
     exit;
 }
 
-$openingChecks = [];
-foreach (FormDefinition::openingSections() as $section) {
-    $posted = $_POST['opening_checks'][$section['key']] ?? [];
-    $values = [];
-    foreach ($section['items'] as $index => $_) {
-        $values[$index] = isset($posted[$index]) ? 1 : 0;
-    }
-    $openingChecks[$section['key']] = $values;
+$schema = TemplateSchema::fromSubmission($database, $existing);
+$responses = TemplateSchema::collectResponsesFromPost($schema, (array) ($_POST['responses'] ?? []));
+$missingRequired = TemplateSchema::missingRequiredFields($schema, $responses);
+if ($missingRequired !== []) {
+    http_response_code(422);
+    echo 'Masih ada field wajib yang belum diisi.';
+    exit;
 }
-
-$teamControl = [];
-foreach (FormDefinition::teamControlItems() as $key => $_) {
-    $teamControl[$key] = (string) ($_POST['team_control'][$key] ?? '');
-}
-
-$serviceControl = [];
-foreach (FormDefinition::serviceControlItems() as $key => $_) {
-    $serviceControl[$key] = (string) ($_POST['service_control'][$key] ?? '');
-}
-
-$floorAwareness = [];
-foreach (FormDefinition::floorAwarenessItems() as $key => $_) {
-    $floorAwareness[$key] = (string) ($_POST['floor_awareness'][$key] ?? '');
-}
-
-$closingControl = [];
-foreach (FormDefinition::closingControlItems() as $key => $_) {
-    $closingControl[$key] = isset($_POST['closing_control'][$key]) ? 1 : 0;
-}
+$meta = TemplateSchema::deriveMeta($schema, $responses);
 
 $payload = [
-    'tanggal' => $tanggal,
-    'floor_captain' => $floorCaptain,
-    'opening_checks' => $openingChecks,
-    'team_control' => $teamControl,
-    'service_control' => $serviceControl,
-    'floor_awareness' => $floorAwareness,
-    'customer_experience' => [
-        'ada_komplain' => (string) ($_POST['customer_experience']['ada_komplain'] ?? ''),
-        'jenis_komplain' => trim((string) ($_POST['customer_experience']['jenis_komplain'] ?? '')),
-        'ditangani_oleh' => trim((string) ($_POST['customer_experience']['ditangani_oleh'] ?? '')),
-    ],
-    'closing_control' => $closingControl,
-    'operational_notes' => [
-        'masalah_hari_ini' => trim((string) ($_POST['operational_notes']['masalah_hari_ini'] ?? '')),
-        'perbaikan' => trim((string) ($_POST['operational_notes']['perbaikan'] ?? '')),
-    ],
+    'tanggal' => $meta['tanggal'],
+    'floor_captain' => $meta['floor_captain'],
+    'opening_checks' => $existing['opening_checks'] ?? [],
+    'team_control' => $existing['team_control'] ?? [],
+    'service_control' => $existing['service_control'] ?? [],
+    'floor_awareness' => $existing['floor_awareness'] ?? [],
+    'customer_experience' => $existing['customer_experience'] ?? [],
+    'closing_control' => $existing['closing_control'] ?? [],
+    'operational_notes' => $existing['operational_notes'] ?? [],
+    'responses' => $responses,
     'signature_strokes' => $existing['signature_strokes'] ?? [],
     'signature_preview' => (string) ($existing['signature_preview'] ?? ''),
 ];
