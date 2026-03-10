@@ -151,6 +151,12 @@ body {
     text-decoration: none;
 }
 
+#submission-detail:empty::before,
+#submission-list:empty::before,
+#admin-notice:empty::before {
+    content: "";
+}
+
 .template-action form {
     margin: 0;
 }

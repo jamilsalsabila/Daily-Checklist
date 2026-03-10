@@ -58,6 +58,26 @@ function response_completion(array $schema, array $responses): string
 
     return $total > 0 ? $answered . '/' . $total : '0/0';
 }
+
+$initialState = [
+    'status' => $status,
+    'csrf_token' => csrf_token(),
+    'filters' => [
+        'tanggal' => $filterDate,
+        'q' => $filterSearch,
+        'code' => $detailCode,
+    ],
+    'templates' => $templates,
+    'template_names' => $templateNamesById,
+    'published_count' => count($publishedTemplates),
+    'submissions' => $submissions,
+    'selected' => $selected,
+    'selected_schema' => $selectedSchema,
+    'selected_completion' => $selected !== null && $selectedSchema !== null
+        ? response_completion($selectedSchema, $selected['responses'] ?? [])
+        : '0/0',
+    'selected_wa_url' => $waMessage !== '' ? 'https://wa.me/?text=' . $waMessage : '',
+];
 ?>
 <!doctype html>
 <html lang="id">
@@ -73,7 +93,7 @@ function response_completion(array $schema, array $responses): string
     <link rel="stylesheet" href="assets/css/pages/admin.css">
 </head>
 <body>
-    <div class="page">
+    <div class="page" id="admin-app">
         <header class="header">
             <div>
                 <h1>Admin Checklist</h1>
@@ -87,31 +107,33 @@ function response_completion(array $schema, array $responses): string
             </div>
         </header>
 
-        <?php if ($status === 'updated'): ?>
-            <div class="notice ok">Submission berhasil diperbarui.</div>
-        <?php elseif ($status === 'deleted'): ?>
-            <div class="notice ok">Submission berhasil dihapus.</div>
-        <?php elseif ($status === 'delete_failed'): ?>
-            <div class="notice bad">Gagal menghapus submission.</div>
-        <?php elseif ($status === 'template_published'): ?>
-            <div class="notice ok">Template berhasil dipublikasikan.</div>
-        <?php elseif ($status === 'template_unpublished'): ?>
-            <div class="notice ok">Template berhasil dinonaktifkan dari publikasi.</div>
-        <?php elseif ($status === 'template_activate_failed'): ?>
-            <div class="notice bad">Gagal mengubah status publikasi template.</div>
-        <?php elseif ($status === 'csrf_error'): ?>
-            <div class="notice bad">Sesi keamanan tidak valid. Silakan ulangi.</div>
-        <?php elseif ($status === 'template_saved'): ?>
-            <div class="notice ok">Template berhasil disimpan.</div>
-        <?php elseif ($status === 'template_deleted'): ?>
-            <div class="notice ok">Template berhasil dihapus.</div>
-        <?php elseif ($status === 'template_delete_failed'): ?>
-            <div class="notice bad">Template tidak bisa dihapus (masih dipublikasikan atau sudah dipakai submission).</div>
-        <?php elseif ($status === 'template_save_failed'): ?>
-            <div class="notice bad">Gagal menyimpan template. Cek data input.</div>
-        <?php endif; ?>
+        <div id="admin-notice">
+            <?php if ($status === 'updated'): ?>
+                <div class="notice ok">Submission berhasil diperbarui.</div>
+            <?php elseif ($status === 'deleted'): ?>
+                <div class="notice ok">Submission berhasil dihapus.</div>
+            <?php elseif ($status === 'delete_failed'): ?>
+                <div class="notice bad">Gagal menghapus submission.</div>
+            <?php elseif ($status === 'template_published'): ?>
+                <div class="notice ok">Template berhasil dipublikasikan.</div>
+            <?php elseif ($status === 'template_unpublished'): ?>
+                <div class="notice ok">Template berhasil dinonaktifkan dari publikasi.</div>
+            <?php elseif ($status === 'template_activate_failed'): ?>
+                <div class="notice bad">Gagal mengubah status publikasi template.</div>
+            <?php elseif ($status === 'csrf_error'): ?>
+                <div class="notice bad">Sesi keamanan tidak valid. Silakan ulangi.</div>
+            <?php elseif ($status === 'template_saved'): ?>
+                <div class="notice ok">Template berhasil disimpan.</div>
+            <?php elseif ($status === 'template_deleted'): ?>
+                <div class="notice ok">Template berhasil dihapus.</div>
+            <?php elseif ($status === 'template_delete_failed'): ?>
+                <div class="notice bad">Template tidak bisa dihapus (masih dipublikasikan atau sudah dipakai submission).</div>
+            <?php elseif ($status === 'template_save_failed'): ?>
+                <div class="notice bad">Gagal menyimpan template. Cek data input.</div>
+            <?php endif; ?>
+        </div>
 
-        <section class="panel template-panel">
+        <section class="panel template-panel" id="template-panel">
             <div class="template-panel-head">
                 <h2>Checklist Template</h2>
                 <div class="template-head-actions">
@@ -169,7 +191,7 @@ function response_completion(array $schema, array $responses): string
 
         <div class="layout">
             <section class="panel">
-                <form class="filters" method="get">
+                <form class="filters" method="get" id="admin-filters">
                     <label class="filter-field">
                         <span>Pencarian</span>
                         <input type="text" name="q" value="<?= e($filterSearch) ?>" placeholder="Cari nama floor captain atau kode">
@@ -184,7 +206,7 @@ function response_completion(array $schema, array $responses): string
                     </div>
                 </form>
 
-                <div class="list">
+                <div class="list" id="submission-list">
                     <?php if ($submissions === []): ?>
                         <div class="empty">Belum ada data yang cocok dengan filter.</div>
                     <?php endif; ?>
@@ -207,7 +229,7 @@ function response_completion(array $schema, array $responses): string
                 </div>
             </section>
 
-            <aside class="panel">
+            <aside class="panel" id="submission-detail">
                 <?php if ($selected === null): ?>
                     <div class="empty">Pilih salah satu submission untuk melihat detail lengkap.</div>
                 <?php else: ?>
@@ -255,5 +277,7 @@ function response_completion(array $schema, array $responses): string
             </aside>
         </div>
     </div>
+    <script id="admin-initial-state" type="application/json"><?= str_replace('</', '<\/', json_encode($initialState, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES)) ?></script>
+    <script src="assets/js/modules/admin-spa.js" defer></script>
 </body>
 </html>
