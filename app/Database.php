@@ -25,19 +25,19 @@ final class Database
 
     public function insertSubmission(array $payload): string
     {
-        $code = 'FCS-' . date('YmdHis') . '-' . strtoupper(substr(bin2hex(random_bytes(3)), 0, 6));
+        $code = 'DOC-' . date('YmdHis') . '-' . strtoupper(substr(bin2hex(random_bytes(3)), 0, 6));
         $activeTemplate = $this->getActiveTemplate();
         $templateId = $payload['template_id'] ?? ($activeTemplate['id'] ?? null);
         $templateVersionId = $payload['template_version_id'] ?? ($activeTemplate['current_version_id'] ?? null);
 
         $statement = $this->pdo->prepare(
             'INSERT INTO submissions (
-                submission_code, tanggal, floor_captain, opening_checks_json, team_control_json,
+                submission_code, tanggal, nama, opening_checks_json, team_control_json,
                 service_control_json, floor_awareness_json, customer_experience_json,
                 closing_control_json, operational_notes_json, responses_json, signature_strokes_json,
                 signature_preview, template_id, template_version_id, created_at
             ) VALUES (
-                :submission_code, :tanggal, :floor_captain, :opening_checks_json, :team_control_json,
+                :submission_code, :tanggal, :nama, :opening_checks_json, :team_control_json,
                 :service_control_json, :floor_awareness_json, :customer_experience_json,
                 :closing_control_json, :operational_notes_json, :responses_json, :signature_strokes_json,
                 :signature_preview, :template_id, :template_version_id, :created_at
@@ -47,7 +47,7 @@ final class Database
         $statement->execute([
             ':submission_code' => $code,
             ':tanggal' => $payload['tanggal'],
-            ':floor_captain' => $payload['floor_captain'],
+            ':nama' => $payload['nama'],
             ':opening_checks_json' => json_encode($payload['opening_checks'], JSON_UNESCAPED_UNICODE),
             ':team_control_json' => json_encode($payload['team_control'], JSON_UNESCAPED_UNICODE),
             ':service_control_json' => json_encode($payload['service_control'], JSON_UNESCAPED_UNICODE),
@@ -110,7 +110,7 @@ final class Database
 
     public function listSubmissions(?string $date = null, string $search = ''): array
     {
-        $sql = 'SELECT submission_code, tanggal, floor_captain, template_id, template_version_id, created_at FROM submissions';
+        $sql = 'SELECT submission_code, tanggal, nama, template_id, template_version_id, created_at FROM submissions';
         $conditions = [];
         $params = [];
 
@@ -120,7 +120,7 @@ final class Database
         }
 
         if ($search !== '') {
-            $conditions[] = '(submission_code LIKE :search OR floor_captain LIKE :search)';
+            $conditions[] = '(submission_code LIKE :search OR nama LIKE :search)';
             $params[':search'] = '%' . $search . '%';
         }
 
@@ -141,7 +141,7 @@ final class Database
         $statement = $this->pdo->prepare(
             'UPDATE submissions SET
                 tanggal = :tanggal,
-                floor_captain = :floor_captain,
+                nama = :nama,
                 opening_checks_json = :opening_checks_json,
                 team_control_json = :team_control_json,
                 service_control_json = :service_control_json,
@@ -158,7 +158,7 @@ final class Database
         $statement->execute([
             ':submission_code' => $code,
             ':tanggal' => $payload['tanggal'],
-            ':floor_captain' => $payload['floor_captain'],
+            ':nama' => $payload['nama'],
             ':opening_checks_json' => json_encode($payload['opening_checks'], JSON_UNESCAPED_UNICODE),
             ':team_control_json' => json_encode($payload['team_control'], JSON_UNESCAPED_UNICODE),
             ':service_control_json' => json_encode($payload['service_control'], JSON_UNESCAPED_UNICODE),
@@ -477,7 +477,7 @@ final class Database
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 submission_code TEXT NOT NULL UNIQUE,
                 tanggal TEXT NOT NULL,
-                floor_captain TEXT NOT NULL,
+                nama TEXT NOT NULL,
                 opening_checks_json TEXT NOT NULL,
                 team_control_json TEXT NOT NULL,
                 service_control_json TEXT NOT NULL,
@@ -494,9 +494,89 @@ final class Database
             )'
         );
 
+        $this->migrateSubmissionsNamaColumn();
         $this->ensureColumnExists('submissions', 'template_id', 'INTEGER');
         $this->ensureColumnExists('submissions', 'template_version_id', 'INTEGER');
         $this->ensureColumnExists('submissions', 'responses_json', 'TEXT NOT NULL DEFAULT "[]"');
+    }
+
+    private function migrateSubmissionsNamaColumn(): void
+    {
+        $statement = $this->pdo->query('PRAGMA table_info(submissions)');
+        $columns = $statement->fetchAll(PDO::FETCH_ASSOC) ?: [];
+        $hasNama = false;
+        $hasFloorCaptain = false;
+        foreach ($columns as $column) {
+            $name = (string) ($column['name'] ?? '');
+            if ($name === 'nama') {
+                $hasNama = true;
+            }
+            if ($name === 'floor_captain') {
+                $hasFloorCaptain = true;
+            }
+        }
+
+        if ($hasNama || !$hasFloorCaptain) {
+            return;
+        }
+
+        try {
+            $this->pdo->exec('ALTER TABLE submissions RENAME COLUMN floor_captain TO nama');
+            return;
+        } catch (Throwable $exception) {
+            // Fallback for older SQLite versions without RENAME COLUMN support.
+        }
+        $this->rebuildSubmissionsTableWithNama();
+    }
+
+    private function rebuildSubmissionsTableWithNama(): void
+    {
+        $this->pdo->beginTransaction();
+        try {
+            $this->pdo->exec(
+                'CREATE TABLE submissions_new (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    submission_code TEXT NOT NULL UNIQUE,
+                    tanggal TEXT NOT NULL,
+                    nama TEXT NOT NULL,
+                    opening_checks_json TEXT NOT NULL,
+                    team_control_json TEXT NOT NULL,
+                    service_control_json TEXT NOT NULL,
+                    floor_awareness_json TEXT NOT NULL,
+                    customer_experience_json TEXT NOT NULL,
+                    closing_control_json TEXT NOT NULL,
+                    operational_notes_json TEXT NOT NULL,
+                    responses_json TEXT NOT NULL DEFAULT "[]",
+                    signature_strokes_json TEXT NOT NULL,
+                    signature_preview TEXT NOT NULL,
+                    template_id INTEGER,
+                    template_version_id INTEGER,
+                    created_at TEXT NOT NULL
+                )'
+            );
+
+            $this->pdo->exec(
+                'INSERT INTO submissions_new (
+                    id, submission_code, tanggal, nama, opening_checks_json, team_control_json,
+                    service_control_json, floor_awareness_json, customer_experience_json,
+                    closing_control_json, operational_notes_json, responses_json,
+                    signature_strokes_json, signature_preview, template_id, template_version_id, created_at
+                )
+                SELECT
+                    id, submission_code, tanggal, floor_captain, opening_checks_json, team_control_json,
+                    service_control_json, floor_awareness_json, customer_experience_json,
+                    closing_control_json, operational_notes_json, responses_json,
+                    signature_strokes_json, signature_preview, template_id, template_version_id, created_at
+                FROM submissions'
+            );
+
+            $this->pdo->exec('DROP TABLE submissions');
+            $this->pdo->exec('ALTER TABLE submissions_new RENAME TO submissions');
+            $this->pdo->commit();
+        } catch (Throwable $exception) {
+            $this->pdo->rollBack();
+            throw $exception;
+        }
     }
 
     private function ensureColumnExists(string $table, string $column, string $definition): void
@@ -542,7 +622,7 @@ final class Database
         );
         $insert->execute([
             ':slug' => self::DEFAULT_TEMPLATE_SLUG,
-            ':name' => 'Floor Captain Control Sheet',
+            ':name' => 'Daily Checklist',
             ':description' => 'Template default checklist operasional harian.',
             ':created_at' => $now,
             ':updated_at' => $now,

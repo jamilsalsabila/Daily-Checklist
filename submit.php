@@ -14,14 +14,18 @@ $signaturePreview = (string) ($_POST['signature_preview'] ?? '');
 $templateIdRaw = trim((string) ($_POST['template_id'] ?? ''));
 $templateVersionIdRaw = trim((string) ($_POST['template_version_id'] ?? ''));
 $templateSlug = trim((string) ($_POST['template_slug'] ?? ''));
+$submitOnceToken = (string) ($_POST['submit_once_token'] ?? '');
 
 $signatureStrokes = json_decode($signatureStrokesRaw, true);
 $templateId = ctype_digit($templateIdRaw) ? (int) $templateIdRaw : null;
 $templateVersionId = ctype_digit($templateVersionIdRaw) ? (int) $templateVersionIdRaw : null;
 
-if (!is_array($signatureStrokes) || $signatureStrokes === [] || $signaturePreview === '') {
-    http_response_code(422);
-    echo 'Data wajib belum lengkap. Silakan kembali dan lengkapi form.';
+if (!consume_form_submit_token($submitOnceToken, 'checklist_submit')) {
+    $redirect = 'index.php?status=form_expired';
+    if ($templateSlug !== '') {
+        $redirect .= '&template=' . urlencode($templateSlug);
+    }
+    header('Location: ' . $redirect);
     exit;
 }
 
@@ -35,6 +39,15 @@ if ($activeTemplate === null) {
 $schema = TemplateSchema::fromTemplate($activeTemplate);
 $templateId = (int) ($activeTemplate['id'] ?? $templateId ?? 0) ?: $templateId;
 $templateVersionId = (int) ($activeTemplate['current_version_id'] ?? $templateVersionId ?? 0) ?: $templateVersionId;
+$hasSignatureField = TemplateSchema::hasSignatureField($schema);
+$signatureRequired = TemplateSchema::isSignatureRequired($schema);
+if ($signatureRequired && (!is_array($signatureStrokes) || $signatureStrokes === [] || $signaturePreview === '')) {
+    http_response_code(422);
+    echo 'Field tanda tangan wajib belum terisi.';
+    exit;
+}
+$signatureStrokes = is_array($signatureStrokes) ? $signatureStrokes : [];
+$signaturePreview = $hasSignatureField ? $signaturePreview : '';
 $responses = TemplateSchema::collectResponsesFromPost($schema, (array) ($_POST['responses'] ?? []));
 $missingRequired = TemplateSchema::missingRequiredFields($schema, $responses);
 if ($missingRequired !== []) {
@@ -46,7 +59,7 @@ $meta = TemplateSchema::deriveMeta($schema, $responses);
 
 $payload = [
     'tanggal' => $meta['tanggal'],
-    'floor_captain' => $meta['floor_captain'],
+    'nama' => $meta['nama'],
     'opening_checks' => [],
     'team_control' => [],
     'service_control' => [],

@@ -23,11 +23,10 @@ function generate_submission_pdf(array $submission): string
     $pdf = new PdfReport();
     $pdf->addTitle((string) ($schema['header']['title'] ?? 'CHECKLIST'));
     $pdf->addSubtitle((string) ($schema['header']['subtitle'] ?? ''));
-    $pdf->addParagraph('Tanggal: ' . ($submission['tanggal'] ?? '-'), 10, 'sans_bold', 1);
-    $pdf->addParagraph('Floor Captain: ' . ($submission['floor_captain'] ?? '-'), 10, 'sans_bold', 6);
     $pdf->addDivider();
 
-    $renderPdfSection = static function (array $section, string $indexPrefix = '') use (&$renderPdfSection, $pdf, $responses): void {
+    $signatureRendered = false;
+    $renderPdfSection = function (array $section, string $indexPrefix = '') use (&$renderPdfSection, $pdf, $responses, $submission, &$signatureRendered): void {
         $sectionTitle = trim((string) ($section['title'] ?? ''));
         if ($sectionTitle !== '') {
             $title = $indexPrefix !== '' ? $indexPrefix . '. ' . $sectionTitle : $sectionTitle;
@@ -41,6 +40,15 @@ function generate_submission_pdf(array $submission): string
             $type = (string) ($field['type'] ?? 'single_line_text');
             $label = (string) ($field['label'] ?? $fieldId);
             $value = $responses[$fieldId] ?? null;
+
+            if ($type === 'signature') {
+                if ($label !== '') {
+                    $pdf->addSubsection($label);
+                }
+                $pdf->addSignature($submission['signature_strokes'] ?? []);
+                $signatureRendered = true;
+                continue;
+            }
 
             if ($type === 'checkbox') {
                 $pdf->addChecklistItem($label, !empty($value));
@@ -67,9 +75,9 @@ function generate_submission_pdf(array $submission): string
         $renderPdfSection($section, (string) ($sectionIndex + 1));
     }
 
-    $pdf->addSection('Persetujuan');
-    $pdf->addParagraph('Nama Floor Captain: ' . ($submission['floor_captain'] ?? '-'));
-    $pdf->addSignature($submission['signature_strokes'] ?? []);
+    if (!$signatureRendered && !empty($submission['signature_strokes'])) {
+        $pdf->addSignature($submission['signature_strokes']);
+    }
 
     return $pdf->output();
 }

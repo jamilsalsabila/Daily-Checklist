@@ -222,6 +222,15 @@ body {
     background: rgba(255, 255, 255, 0.88);
 }
 
+.preview-field .signature-box {
+    border: 1px dashed var(--line);
+    border-radius: 10px;
+    padding: 12px;
+    background: rgba(255, 255, 255, 0.86);
+    color: var(--soft);
+    font-size: 12px;
+}
+
 .builder-head {
     display: flex;
     align-items: center;

@@ -45,9 +45,9 @@ function admin_build_state(Database $database, string $filterDate, string $filte
     if ($selected !== null) {
         $pdfUrl = app_base_url() . '/pdf.php?code=' . urlencode((string) $selected['submission_code']);
         $waMessage = rawurlencode(
-            "Floor Captain Control Sheet\n" .
+            "Daily Checklist\n" .
             "Tanggal: {$selected['tanggal']}\n" .
-            "Floor Captain: {$selected['floor_captain']}\n" .
+            "Nama: {$selected['nama']}\n" .
             "PDF: {$pdfUrl}"
         );
         $waUrl = 'https://wa.me/?text=' . $waMessage;

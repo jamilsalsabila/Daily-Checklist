@@ -119,7 +119,6 @@ final class PdfReport
 
         $this->raw("0.55 0.58 0.64 RG 1 w\n");
         $this->raw(sprintf("%.2F %.2F %.2F %.2F re S\n", $x, $yBottom, $boxWidth, $boxHeight));
-        $this->textAt($x, $yBottom - 16, 'Tanda tangan Floor Captain', 9.5, 'sans');
 
         $normalized = $this->normalizeSignatureStrokes($strokes, $x, $yBottom, $boxWidth, $boxHeight);
         foreach ($normalized as $points) {

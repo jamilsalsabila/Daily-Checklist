@@ -5,6 +5,9 @@ declare(strict_types=1);
 require_once __DIR__ . '/app/bootstrap.php';
 
 $isAdminSession = admin_is_authenticated();
+$status = trim((string) ($_GET['status'] ?? ''));
+$formValidationVersion = (string) @filemtime(__DIR__ . '/assets/js/modules/form-validation.js');
+$signaturePadVersion = (string) @filemtime(__DIR__ . '/assets/js/modules/signature-pad.js');
 $requestedSlug = trim((string) ($_GET['template'] ?? ''));
 $publishedTemplates = $database->listPublishedTemplates();
 $selectedTemplate = null;
@@ -21,6 +24,11 @@ if ($requestedSlug !== '') {
 }
 
 $schema = $selectedTemplate !== null ? TemplateSchema::fromTemplate($selectedTemplate) : null;
+$submitOnceToken = $schema !== null ? issue_form_submit_token('checklist_submit') : '';
+
+header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
+header('Pragma: no-cache');
+header('Expires: 0');
 
 function render_field_input(array $field, mixed $value = null): string
 {
@@ -51,8 +59,10 @@ function render_field_input(array $field, mixed $value = null): string
     }
 
     if ($type === 'multi_select') {
+        $requiredGroup = !empty($field['required']) ? ' data-required-group="1"' : '';
+        $requiredLabel = ' data-required-label="' . e((string) ($field['label'] ?? 'Field')) . '"';
         $values = is_array($value) ? array_map('strval', $value) : [];
-        $html = '<div class="status-options">';
+        $html = '<div class="status-options"' . $requiredGroup . $requiredLabel . '>';
         foreach ((array) ($field['options'] ?? []) as $option) {
             $optionText = (string) $option;
             $checked = in_array($optionText, $values, true) ? ' checked' : '';
@@ -60,6 +70,19 @@ function render_field_input(array $field, mixed $value = null): string
         }
         $html .= '</div>';
         return $html;
+    }
+
+    if ($type === 'signature') {
+        $requiredAttr = $required;
+        return '<div class="signature-box" data-signature-widget="1">'
+            . '<canvas class="signature-pad" id="signature-pad" width="640" height="320"></canvas>'
+            . '<div class="signature-actions">'
+            . '<button type="button" class="btn btn-secondary" id="clear-signature">Hapus tanda tangan</button>'
+            . '</div>'
+            . '<input type="hidden" name="signature_strokes" id="signature-strokes"' . $requiredAttr . '>'
+            . '<input type="hidden" name="signature_preview" id="signature-preview"' . $requiredAttr . '>'
+            . '<input type="hidden" name="' . e($name) . '" id="signature-response" value="' . e((string) $value) . '"' . $required . '>'
+            . '</div>';
     }
 
     $inputType = match ($type) {
@@ -96,15 +119,22 @@ function render_section_form(array $section, int $depth = 0): string
         $html .= '<p class="section-kicker">' . e($description) . '</p>';
     }
 
-    if ($fields !== []) {
-        $html .= '<div class="grid">';
-        foreach ($fields as $field) {
-            $type = (string) ($field['type'] ?? 'single_line_text');
-            if ($type === 'checkbox') {
-                $html .= '<label class="check-item">'
-                    . render_field_input($field)
-                    . '<span' . render_text_style_attr($field['label_style'] ?? []) . '>' . e((string) ($field['label'] ?? '')) . '</span>'
-                    . '</label>';
+        if ($fields !== []) {
+            $html .= '<div class="grid">';
+            foreach ($fields as $field) {
+                $type = (string) ($field['type'] ?? 'single_line_text');
+                if ($type === 'signature') {
+                    $html .= '<div class="meta signature-meta">'
+                        . '<span' . render_text_style_attr($field['label_style'] ?? []) . '>' . e((string) ($field['label'] ?? '')) . '</span>'
+                        . render_field_input($field)
+                        . '</div>';
+                    continue;
+                }
+                if ($type === 'checkbox') {
+                    $html .= '<label class="check-item">'
+                        . render_field_input($field)
+                        . '<span' . render_text_style_attr($field['label_style'] ?? []) . '>' . e((string) ($field['label'] ?? '')) . '</span>'
+                        . '</label>';
                 continue;
             }
             $html .= '<label class="meta">'
@@ -153,6 +183,9 @@ function render_section_form(array $section, int $depth = 0): string
                 <p<?= render_text_style_attr($schema['header']['subtitle_style'] ?? []) ?>><?= e((string) ($schema['header']['subtitle'] ?? '')) ?></p>
             <?php endif; ?>
         </section>
+        <?php if ($status === 'form_expired'): ?>
+            <div class="notice bad">Form lama sudah tidak valid. Silakan isi ulang dari halaman ini.</div>
+        <?php endif; ?>
 
         <?php if ($schema === null): ?>
             <section class="sheet">
@@ -172,29 +205,13 @@ function render_section_form(array $section, int $depth = 0): string
             </section>
         <?php else: ?>
             <form action="submit.php" method="post" id="checklist-form">
+                <input type="hidden" name="submit_once_token" value="<?= e($submitOnceToken) ?>">
                 <input type="hidden" name="template_id" value="<?= e((string) ($selectedTemplate['id'] ?? '')) ?>">
                 <input type="hidden" name="template_version_id" value="<?= e((string) ($selectedTemplate['current_version_id'] ?? '')) ?>">
                 <input type="hidden" name="template_slug" value="<?= e((string) ($selectedTemplate['slug'] ?? '')) ?>">
                 <?php foreach ($schema['sections'] as $section): ?>
                     <?= render_section_form($section) ?>
                 <?php endforeach; ?>
-
-                <section class="sheet">
-                    <div class="section-head">
-                        <div>
-                            <h2 class="section-title">Tanda Tangan</h2>
-                        </div>
-                    </div>
-                    <div class="signature-box">
-                        <canvas id="signature-pad" width="640" height="320"></canvas>
-                        <div class="signature-actions">
-                            <span class="help">Tanda tangan langsung di area ini. Wajib diisi sebelum submit.</span>
-                            <button type="button" class="btn btn-secondary" id="clear-signature">Hapus tanda tangan</button>
-                        </div>
-                    </div>
-                    <input type="hidden" name="signature_strokes" id="signature-strokes" required>
-                    <input type="hidden" name="signature_preview" id="signature-preview" required>
-                </section>
 
                 <div class="submit-wrap">
                     <button class="btn btn-primary" type="submit">Submit checklist</button>
@@ -204,7 +221,10 @@ function render_section_form(array $section, int $depth = 0): string
     </div>
 
     <?php if ($schema !== null): ?>
-        <script src="assets/js/modules/signature-pad.js" defer></script>
+        <script src="assets/js/modules/form-validation.js?v=<?= e($formValidationVersion) ?>" defer></script>
+    <?php endif; ?>
+    <?php if ($schema !== null && TemplateSchema::hasSignatureField($schema)): ?>
+        <script src="assets/js/modules/signature-pad.js?v=<?= e($signaturePadVersion) ?>" defer></script>
     <?php endif; ?>
 </body>
 </html>

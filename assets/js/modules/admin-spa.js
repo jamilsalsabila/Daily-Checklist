@@ -146,7 +146,7 @@
                 return `
                     <a class="item${selectedCode === item.submission_code ? ' active' : ''}" href="?${params.toString()}" data-code="${escapeHtml(item.submission_code || '')}">
                         <div class="row">
-                            <strong>${escapeHtml(item.floor_captain || '-')}</strong>
+                            <strong>${escapeHtml(item.nama || '-')}</strong>
                             <span class="code">${escapeHtml(item.submission_code || '-')}</span>
                         </div>
                         <div class="row muted">
@@ -173,7 +173,7 @@
             <div class="detail-grid">
                 <div class="detail-card">
                     <h3>Ringkasan</h3>
-                    <p><strong>Floor Captain:</strong> ${escapeHtml(selected.floor_captain || '-')}</p>
+                    <p><strong>Nama:</strong> ${escapeHtml(selected.nama || '-')}</p>
                     <p><strong>Tanggal:</strong> ${escapeHtml(selected.tanggal || '-')}</p>
                     <p><strong>Template:</strong> ${escapeHtml((state.template_names || {})[String(selected.template_id)] || (state.template_names || {})[Number(selected.template_id)] || '-')}</p>
                     <div class="chips">
@@ -195,10 +195,12 @@
                         ${renderSectionDetail(section, selected.responses || {}, 0)}
                     `).join('')}
                 </div>
-                <div class="detail-card">
-                    <h3>Tanda Tangan</h3>
-                    <img class="signature-preview" src="${escapeHtml(selected.signature_preview || '')}" alt="Signature preview">
-                </div>
+                ${String(selected.signature_preview || '').trim() !== '' ? `
+                    <div class="detail-card">
+                        <h3>Tanda Tangan</h3>
+                        <img class="signature-preview" src="${escapeHtml(selected.signature_preview || '')}" alt="Signature preview">
+                    </div>
+                ` : ''}
             </div>
         `;
     };

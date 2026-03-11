@@ -53,6 +53,13 @@ function render_edit_field_input(array $field, mixed $value = null): string
         $html .= '</div>';
         return $html;
     }
+    if ($type === 'signature') {
+        $signed = trim((string) $value) !== '';
+        return '<div class="signature-readonly">'
+            . '<span>' . ($signed ? 'Tanda tangan sudah tersimpan.' : 'Belum ada tanda tangan tersimpan.') . '</span>'
+            . '<input type="hidden" name="' . e($name) . '" value="' . e((string) $value) . '"' . $required . '>'
+            . '</div>';
+    }
 
     $inputType = match ($type) {
         'date' => 'date',
@@ -88,6 +95,13 @@ function render_edit_section(array $section, array $responses, int $depth = 0): 
         foreach ($fields as $field) {
             $type = (string) ($field['type'] ?? 'single_line_text');
             $value = $responses[$field['id']] ?? null;
+            if ($type === 'signature') {
+                $html .= '<div class="meta signature-meta">'
+                    . '<span' . render_text_style_attr($field['label_style'] ?? []) . '>' . e((string) ($field['label'] ?? '')) . '</span>'
+                    . render_edit_field_input($field, $value)
+                    . '</div>';
+                continue;
+            }
             if ($type === 'checkbox') {
                 $html .= '<label class="check-item">'
                     . render_edit_field_input($field, $value)

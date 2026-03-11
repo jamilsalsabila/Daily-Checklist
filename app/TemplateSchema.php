@@ -14,6 +14,7 @@ final class TemplateSchema
         'date',
         'number',
         'time',
+        'signature',
     ];
     private const ALLOWED_FONT_FAMILIES = ['default', 'sans', 'serif', 'mono'];
 
@@ -26,7 +27,7 @@ final class TemplateSchema
             'title' => 'Informasi Utama',
             'fields' => [
                 ['id' => 'meta_tanggal', 'type' => 'date', 'label' => 'Tanggal', 'required' => true],
-                ['id' => 'meta_floor_captain', 'type' => 'single_line_text', 'label' => 'Floor Captain', 'required' => true],
+                ['id' => 'meta_floor_captain', 'type' => 'single_line_text', 'label' => 'Nama', 'required' => true],
             ],
         ];
 
@@ -182,7 +183,8 @@ final class TemplateSchema
     public static function deriveMeta(array $schema, array $responses): array
     {
         $tanggal = '';
-        $floorCaptain = '';
+        $nama = '';
+        $nameFallback = '';
 
         foreach (self::flattenFields($schema) as $field) {
             $fieldId = (string) $field['id'];
@@ -195,19 +197,29 @@ final class TemplateSchema
             }
 
             if (
-                $floorCaptain === '' &&
+                $nama === '' &&
                 is_string($value) &&
                 $value !== '' &&
                 in_array($type, ['single_line_text', 'long_text'], true) &&
                 (str_contains($label, 'floor captain') || str_contains($fieldId, 'floor_captain'))
             ) {
-                $floorCaptain = $value;
+                $nama = $value;
+            }
+
+            if (
+                $nameFallback === '' &&
+                is_string($value) &&
+                $value !== '' &&
+                in_array($type, ['single_line_text', 'long_text'], true) &&
+                ($label === 'nama' || str_starts_with($label, 'nama ') || str_contains($fieldId, 'nama'))
+            ) {
+                $nameFallback = $value;
             }
         }
 
         return [
             'tanggal' => $tanggal !== '' ? $tanggal : date('Y-m-d'),
-            'floor_captain' => $floorCaptain !== '' ? $floorCaptain : '-',
+            'nama' => $nama !== '' ? $nama : ($nameFallback !== '' ? $nameFallback : '-'),
         ];
     }
 
@@ -261,9 +273,33 @@ final class TemplateSchema
         return self::flattenFields($schema);
     }
 
+    public static function hasSignatureField(array $schema): bool
+    {
+        foreach (self::allFields($schema) as $field) {
+            if ((string) ($field['type'] ?? '') === 'signature') {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    public static function isSignatureRequired(array $schema): bool
+    {
+        foreach (self::allFields($schema) as $field) {
+            if ((string) ($field['type'] ?? '') !== 'signature') {
+                continue;
+            }
+            return !empty($field['required']);
+        }
+        return false;
+    }
+
     public static function responseDisplayValue(array $field, mixed $value): string
     {
         $type = (string) ($field['type'] ?? 'single_line_text');
+        if ($type === 'signature') {
+            return trim((string) $value) !== '' ? 'Tertandatangani' : 'Belum ditandatangani';
+        }
         if ($type === 'checkbox') {
             return !empty($value) ? 'Ya' : 'Tidak';
         }
@@ -308,7 +344,8 @@ final class TemplateSchema
 
         $seenSectionIds = [];
         $seenFieldIds = [];
-        $sections = self::normalizeSectionLevel($value, 1, $seenSectionIds, $seenFieldIds, 'section');
+        $signatureFound = false;
+        $sections = self::normalizeSectionLevel($value, 1, $seenSectionIds, $seenFieldIds, 'section', $signatureFound);
         return $sections !== [] ? $sections : self::defaults()['sections'];
     }
 
@@ -317,7 +354,8 @@ final class TemplateSchema
         int $depth,
         array &$seenSectionIds,
         array &$seenFieldIds,
-        string $parentKey
+        string $parentKey,
+        bool &$signatureFound
     ): array {
         if ($depth > self::MAX_SECTION_DEPTH) {
             return [];
@@ -338,8 +376,8 @@ final class TemplateSchema
 
             $title = trim((string) ($sectionRaw['title'] ?? ''));
             $description = trim((string) ($sectionRaw['description'] ?? ''));
-            $fields = self::normalizeFields($sectionRaw['fields'] ?? [], $sectionId, $seenFieldIds);
-            $children = self::normalizeSectionLevel((array) ($sectionRaw['children'] ?? []), $depth + 1, $seenSectionIds, $seenFieldIds, $sectionId);
+            $fields = self::normalizeFields($sectionRaw['fields'] ?? [], $sectionId, $seenFieldIds, $signatureFound);
+            $children = self::normalizeSectionLevel((array) ($sectionRaw['children'] ?? []), $depth + 1, $seenSectionIds, $seenFieldIds, $sectionId, $signatureFound);
             if ($fields === [] && $children === []) {
                 continue;
             }
@@ -360,7 +398,7 @@ final class TemplateSchema
         return $sections;
     }
 
-    private static function normalizeFields(mixed $value, string $sectionId, array &$seenFieldIds): array
+    private static function normalizeFields(mixed $value, string $sectionId, array &$seenFieldIds, bool &$signatureFound): array
     {
         if (!is_array($value)) {
             return [];
@@ -375,6 +413,12 @@ final class TemplateSchema
             $type = strtolower(trim((string) ($fieldRaw['type'] ?? 'single_line_text')));
             if (!in_array($type, self::ALLOWED_TYPES, true)) {
                 $type = 'single_line_text';
+            }
+            if ($type === 'signature') {
+                if ($signatureFound) {
+                    continue;
+                }
+                $signatureFound = true;
             }
 
             $fieldId = self::sanitizeKey((string) ($fieldRaw['id'] ?? ''), $sectionId . '_field_' . ($index + 1));
@@ -573,7 +617,7 @@ final class TemplateSchema
             return (string) ($submission['tanggal'] ?? '');
         }
         if ($fieldId === 'meta_floor_captain') {
-            return (string) ($submission['floor_captain'] ?? '');
+            return (string) ($submission['nama'] ?? '');
         }
 
         if (str_starts_with($fieldId, 'opening_')) {

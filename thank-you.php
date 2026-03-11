@@ -16,9 +16,9 @@ if ($submission === null) {
 
 $pdfUrl = app_base_url() . '/pdf.php?code=' . urlencode($code);
 $waMessage = rawurlencode(
-    "Floor Captain Control Sheet\n" .
+    "Daily Checklist\n" .
     "Tanggal: {$submission['tanggal']}\n" .
-    "Floor Captain: {$submission['floor_captain']}\n" .
+    "Nama: {$submission['nama']}\n" .
     "PDF: {$pdfUrl}"
 );
 $emailStatus = (string) ($_GET['email_status'] ?? '');
@@ -41,7 +41,7 @@ $emailError = trim((string) ($_GET['email_error'] ?? ''));
         <h1>Terima kasih</h1>
         <p>Checklist sudah tersimpan ke database dan PDF sudah dibuat.</p>
         <p class="meta">Kode submission: <strong><?= e($submission['submission_code']) ?></strong></p>
-        <p class="meta">Tanggal: <?= e($submission['tanggal']) ?> | Floor Captain: <?= e($submission['floor_captain']) ?></p>
+        <p class="meta">Tanggal: <?= e($submission['tanggal']) ?> | Nama: <?= e($submission['nama']) ?></p>
 
         <?php if ($emailStatus === 'sent'): ?>
             <div class="notice">Email berhasil dikirim.</div>

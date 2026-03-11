@@ -307,6 +307,19 @@ canvas {
     line-height: 1.5;
 }
 
+.notice {
+    margin-top: 14px;
+    border-radius: 14px;
+    padding: 12px 14px;
+    font-size: 14px;
+}
+
+.notice.bad {
+    background: #fff1f2;
+    color: #9f1239;
+    border: 1px solid #fecdd3;
+}
+
 .template-picker {
     display: grid;
     gap: 10px;

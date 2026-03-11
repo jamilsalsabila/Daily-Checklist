@@ -45,10 +45,10 @@ if ($pdfData === false) {
     exit;
 }
 
-$subject = 'Floor Captain Control Sheet - ' . $submission['tanggal'];
-$bodyText = "Terlampir PDF Floor Captain Control Sheet.\n\n" .
+$subject = 'Daily Checklist - ' . $submission['tanggal'];
+$bodyText = "Terlampir PDF Daily Checklist.\n\n" .
     "Tanggal: {$submission['tanggal']}\n" .
-    "Floor Captain: {$submission['floor_captain']}\n" .
+    "Nama: {$submission['nama']}\n" .
     "Kode Submission: {$submission['submission_code']}\n";
 
 $mailer = new SmtpMailer([

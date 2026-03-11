@@ -42,7 +42,7 @@ $meta = TemplateSchema::deriveMeta($schema, $responses);
 
 $payload = [
     'tanggal' => $meta['tanggal'],
-    'floor_captain' => $meta['floor_captain'],
+    'nama' => $meta['nama'],
     'opening_checks' => $existing['opening_checks'] ?? [],
     'team_control' => $existing['team_control'] ?? [],
     'service_control' => $existing['service_control'] ?? [],

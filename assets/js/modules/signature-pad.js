@@ -1,11 +1,17 @@
-const canvas = document.getElementById('signature-pad');
-const ctx = canvas?.getContext('2d');
-const strokesInput = document.getElementById('signature-strokes');
-const previewInput = document.getElementById('signature-preview');
-const clearButton = document.getElementById('clear-signature');
-const form = document.getElementById('checklist-form');
+(() => {
+    const widget = document.querySelector('[data-signature-widget="1"]');
+    const canvas = widget?.querySelector('#signature-pad');
+    const ctx = canvas?.getContext('2d');
+    const strokesInput = widget?.querySelector('#signature-strokes');
+    const previewInput = widget?.querySelector('#signature-preview');
+    const responseInput = widget?.querySelector('#signature-response');
+    const clearButton = widget?.querySelector('#clear-signature');
+    const form = document.getElementById('checklist-form');
 
-if (canvas && ctx && strokesInput && previewInput && clearButton && form) {
+    if (!widget || !canvas || !ctx || !strokesInput || !previewInput || !clearButton || !form) {
+        return;
+    }
+
     let drawing = false;
     let currentStroke = [];
     let strokes = [];
@@ -23,10 +29,11 @@ if (canvas && ctx && strokesInput && previewInput && clearButton && form) {
 
     function getPoint(event) {
         const rect = canvas.getBoundingClientRect();
-        const point = event.touches ? event.touches[0] : event;
+        const touch = typeof TouchEvent !== 'undefined' && event instanceof TouchEvent ? event.touches[0] : null;
+        const source = touch ?? event;
         return {
-            x: Math.max(0, Math.min(rect.width, point.clientX - rect.left)),
-            y: Math.max(0, Math.min(rect.height, point.clientY - rect.top))
+            x: Math.max(0, Math.min(rect.width, source.clientX - rect.left)),
+            y: Math.max(0, Math.min(rect.height, source.clientY - rect.top)),
         };
     }
 
@@ -48,18 +55,21 @@ if (canvas && ctx && strokesInput && previewInput && clearButton && form) {
     }
 
     function endDraw() {
+        if (!drawing) return;
         drawing = false;
         syncSignatureFields();
     }
 
     function redraw() {
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        const rect = canvas.getBoundingClientRect();
+        ctx.clearRect(0, 0, rect.width, rect.height);
         ctx.lineJoin = 'round';
         ctx.lineCap = 'round';
         ctx.strokeStyle = '#111827';
         ctx.lineWidth = isCoarsePointer ? 2.8 : 2.2;
+
         strokes.forEach((stroke) => {
-            if (stroke.length < 2) return;
+            if (!Array.isArray(stroke) || stroke.length < 2) return;
             ctx.beginPath();
             ctx.moveTo(stroke[0].x, stroke[0].y);
 
@@ -72,17 +82,21 @@ if (canvas && ctx && strokesInput && previewInput && clearButton && form) {
                 const last = stroke[stroke.length - 1];
                 ctx.lineTo(last.x, last.y);
             } else {
-                stroke.slice(1).forEach((point) => ctx.lineTo(point.x, point.y));
+                for (let i = 1; i < stroke.length; i += 1) {
+                    ctx.lineTo(stroke[i].x, stroke[i].y);
+                }
             }
-
             ctx.stroke();
         });
     }
 
     function syncSignatureFields() {
-        const filtered = strokes.filter((stroke) => stroke.length > 1);
+        const filtered = strokes.filter((stroke) => Array.isArray(stroke) && stroke.length > 1);
         strokesInput.value = JSON.stringify(filtered);
         previewInput.value = filtered.length ? canvas.toDataURL('image/png') : '';
+        if (responseInput) {
+            responseInput.value = filtered.length ? 'signed' : '';
+        }
     }
 
     clearButton.addEventListener('click', () => {
@@ -98,15 +112,21 @@ if (canvas && ctx && strokesInput && previewInput && clearButton && form) {
     canvas.addEventListener('touchstart', startDraw, { passive: false });
     canvas.addEventListener('touchmove', draw, { passive: false });
     window.addEventListener('touchend', endDraw);
+    window.addEventListener('touchcancel', endDraw);
 
     form.addEventListener('submit', (event) => {
+        if (event.defaultPrevented) return;
         syncSignatureFields();
-        if (!previewInput.value || !strokesInput.value || JSON.parse(strokesInput.value).length === 0) {
+        const isRequired = Boolean(responseInput?.required);
+        const hasStroke = previewInput.value && strokesInput.value && JSON.parse(strokesInput.value).length > 0;
+        if (isRequired && !hasStroke) {
             event.preventDefault();
-            alert('Tanda tangan wajib diisi sebelum submit.');
+            window.alert('Tanda tangan wajib diisi sebelum submit.');
         }
     });
 
-    window.addEventListener('resize', resizeCanvas);
+    window.addEventListener('orientationchange', () => {
+        window.setTimeout(resizeCanvas, 180);
+    }, { passive: true });
     resizeCanvas();
-}
+})();

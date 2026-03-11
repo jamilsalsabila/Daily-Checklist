@@ -25,9 +25,9 @@ $waMessage = '';
 if ($selected !== null) {
     $pdfUrl = app_base_url() . '/pdf.php?code=' . urlencode((string) $selected['submission_code']);
     $waMessage = rawurlencode(
-        "Floor Captain Control Sheet\n" .
+        "Daily Checklist\n" .
         "Tanggal: {$selected['tanggal']}\n" .
-        "Floor Captain: {$selected['floor_captain']}\n" .
+        "Nama: {$selected['nama']}\n" .
         "PDF: {$pdfUrl}"
     );
 }
@@ -218,7 +218,7 @@ $initialState = [
                 <form class="filters" method="get" id="admin-filters">
                     <label class="filter-field">
                         <span>Pencarian</span>
-                        <input type="text" name="q" value="<?= e($filterSearch) ?>" placeholder="Cari nama floor captain atau kode">
+                        <input type="text" name="q" value="<?= e($filterSearch) ?>" placeholder="Cari nama ...">
                     </label>
                     <label class="filter-field">
                         <span>Tanggal</span>
@@ -238,7 +238,7 @@ $initialState = [
                     <?php foreach ($submissions as $item): ?>
                         <a class="item <?= $selected !== null && $selected['submission_code'] === $item['submission_code'] ? 'active' : '' ?>" href="?<?= http_build_query(['q' => $filterSearch, 'tanggal' => $filterDate, 'code' => $item['submission_code']]) ?>">
                             <div class="row">
-                                <strong><?= e($item['floor_captain']) ?></strong>
+                                <strong><?= e($item['nama']) ?></strong>
                                 <span class="code"><?= e($item['submission_code']) ?></span>
                             </div>
                             <div class="row muted">
@@ -260,7 +260,7 @@ $initialState = [
                     <div class="detail-grid">
                         <div class="detail-card">
                             <h3>Ringkasan</h3>
-                            <p><strong>Floor Captain:</strong> <?= e($selected['floor_captain']) ?></p>
+                            <p><strong>Nama:</strong> <?= e($selected['nama']) ?></p>
                             <p><strong>Tanggal:</strong> <?= e($selected['tanggal']) ?></p>
                             <p><strong>Template:</strong> <?= e($templateNamesById[(int) ($selected['template_id'] ?? 0)] ?? '-') ?></p>
                             <div class="chips">
@@ -288,10 +288,12 @@ $initialState = [
                             <?php endforeach; ?>
                         </div>
 
-                        <div class="detail-card">
-                            <h3>Tanda Tangan</h3>
-                            <img class="signature-preview" src="<?= e($selected['signature_preview']) ?>" alt="Signature preview">
-                        </div>
+                        <?php if (trim((string) ($selected['signature_preview'] ?? '')) !== ''): ?>
+                            <div class="detail-card">
+                                <h3>Tanda Tangan</h3>
+                                <img class="signature-preview" src="<?= e($selected['signature_preview']) ?>" alt="Signature preview">
+                            </div>
+                        <?php endif; ?>
                     </div>
                 <?php endif; ?>
             </aside>

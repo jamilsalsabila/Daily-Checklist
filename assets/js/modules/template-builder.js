@@ -41,6 +41,7 @@
         { value: 'date', label: 'Date' },
         { value: 'number', label: 'Number' },
         { value: 'time', label: 'Time' },
+        { value: 'signature', label: 'Signature' },
     ];
     const fontOptions = [
         { value: '', label: 'Default' },
@@ -295,6 +296,7 @@
         const toggleOptionsVisibility = () => {
             const type = typeSelect.value;
             optionsRow.style.display = (type === 'single_select' || type === 'multi_select') ? 'grid' : 'none';
+            placeholderInput.style.display = type === 'signature' ? 'none' : '';
         };
         typeSelect.addEventListener('change', toggleOptionsVisibility);
         toggleOptionsVisibility();
@@ -537,6 +539,16 @@
             input.disabled = true;
             input.placeholder = field.placeholder || '';
             wrapper.appendChild(input);
+            return wrapper;
+        }
+
+        if (type === 'signature') {
+            const box = document.createElement('div');
+            box.className = 'signature-box';
+            const hint = document.createElement('small');
+            hint.textContent = 'Area tanda tangan';
+            box.appendChild(hint);
+            wrapper.appendChild(box);
             return wrapper;
         }
 

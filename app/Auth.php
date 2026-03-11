@@ -115,6 +115,55 @@ function verify_csrf_token(?string $provided): bool
     return is_string($sessionToken) && $sessionToken !== '' && is_string($provided) && hash_equals($sessionToken, $provided);
 }
 
+function issue_form_submit_token(string $scope = 'default'): string
+{
+    auth_bootstrap_session();
+    if (!isset($_SESSION['form_submit_tokens']) || !is_array($_SESSION['form_submit_tokens'])) {
+        $_SESSION['form_submit_tokens'] = [];
+    }
+    if (!isset($_SESSION['form_submit_tokens'][$scope]) || !is_array($_SESSION['form_submit_tokens'][$scope])) {
+        $_SESSION['form_submit_tokens'][$scope] = [];
+    }
+
+    $now = time();
+    foreach ($_SESSION['form_submit_tokens'][$scope] as $token => $issuedAt) {
+        if (!is_int($issuedAt) || ($now - $issuedAt) > 7200) {
+            unset($_SESSION['form_submit_tokens'][$scope][$token]);
+        }
+    }
+
+    $token = bin2hex(random_bytes(32));
+    $_SESSION['form_submit_tokens'][$scope][$token] = $now;
+
+    if (count($_SESSION['form_submit_tokens'][$scope]) > 50) {
+        asort($_SESSION['form_submit_tokens'][$scope]);
+        while (count($_SESSION['form_submit_tokens'][$scope]) > 50) {
+            $firstKey = array_key_first($_SESSION['form_submit_tokens'][$scope]);
+            if ($firstKey === null) {
+                break;
+            }
+            unset($_SESSION['form_submit_tokens'][$scope][$firstKey]);
+        }
+    }
+
+    return $token;
+}
+
+function consume_form_submit_token(?string $provided, string $scope = 'default'): bool
+{
+    auth_bootstrap_session();
+    if (!is_string($provided) || $provided === '') {
+        return false;
+    }
+    $tokens = $_SESSION['form_submit_tokens'][$scope] ?? null;
+    if (!is_array($tokens) || !isset($tokens[$provided])) {
+        return false;
+    }
+
+    unset($_SESSION['form_submit_tokens'][$scope][$provided]);
+    return true;
+}
+
 function enforce_login_rate_limit(): void
 {
     auth_bootstrap_session();

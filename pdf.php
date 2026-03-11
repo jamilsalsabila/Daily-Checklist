@@ -14,9 +14,7 @@ if ($submission === null) {
 }
 
 $path = pdf_file_path($submission['submission_code']);
-if (!is_file($path)) {
-    save_submission_pdf($submission);
-}
+save_submission_pdf($submission);
 
 header('Content-Type: application/pdf');
 header('Content-Disposition: inline; filename="' . $submission['submission_code'] . '.pdf"');
